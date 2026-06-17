@@ -1056,7 +1056,22 @@ export default function App() {
             )}
             <div className={`wheel smallWheel ${girando ? 'spin' : ''}`}><div>GIRAR</div></div>
             <button className="primary big" disabled={!participantePuedeGirar || participantesDisponiblesRuleta.length === 0} onClick={girar}>Girar ruleta</button>
-            {resultado && <div className="winner"><h3>{resultado.nombre === 'Sigue intentando' ? 'Sigue intentando' : '¡Felicitaciones!'}</h3><p>Resultado: <strong>{resultado.nombre}</strong></p><small>Premio sujeto a validación de factura, disponibilidad y condiciones.</small></div>}
+            {resultado && (() => {
+              const nombreResultado = String(resultado?.nombre || '').trim();
+              const categoriaResultado = String(resultado?.categoria || '').trim().toLowerCase();
+              const esSigueIntentando = nombreResultado.toLowerCase() === 'sigue intentando' || categoriaResultado === 'sin premio' || categoriaResultado === 'beneficio';
+              return (
+                <div className={esSigueIntentando ? 'winner noPrize' : 'winner prizeWin'}>
+                  <h3>{esSigueIntentando ? 'Sigue intentando' : '¡Felicitaciones!'}</h3>
+                  <p>Resultado: <strong>{nombreResultado}</strong></p>
+                  {esSigueIntentando ? (
+                    <small>Esta vez no obtuviste premio. Puedes seguir participando con tus próximas compras.</small>
+                  ) : (
+                    <small>Premio sujeto a validación de factura, disponibilidad y condiciones.</small>
+                  )}
+                </div>
+              );
+            })()}
           </section>
         )}
 
