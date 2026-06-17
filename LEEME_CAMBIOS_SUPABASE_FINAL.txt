@@ -1,0 +1,71 @@
+VERSION CORREGIDA SUPABASE FINAL
+
+Cambios aplicados:
+1. Se eliminó el guardado automático que sobrescribía premios en Supabase.
+2. Los premios se leen desde Supabase.
+3. La edición de premios en Admin ahora actualiza Supabase inmediatamente.
+4. La carga CSV reemplaza premios en Supabase y se ve igual en otros equipos.
+5. La ruleta descuenta stock en Supabase.
+6. Los ganadores se guardan en Supabase.
+7. Los participantes se guardan en Supabase.
+8. La auditoría administrativa se guarda en Supabase.
+9. Se agregó borrado de datos demo en Supabase conservando premios/configuración.
+
+Prueba local:
+1. Abrir esta carpeta en VS Code.
+2. Ejecutar: npm install
+3. Ejecutar: npm run dev
+4. Abrir http://localhost:5173
+
+Subida a GitHub/Vercel:
+1. git add .
+2. git commit -m "correccion final supabase premios admin"
+3. git push -u origin main --force
+4. En Vercel hacer redeploy.
+
+
+CAMBIOS 2026-06-15 - REGLAMENTO PDF Y BORRADO REAL
+1. Se incluyo public/Reglamento_Oficial_Ruta_Mundial_Mueble_2026.pdf.
+2. La seccion Reglamento del aplicativo ahora muestra resumen robusto y botones para ver/descargar PDF.
+3. El checkbox de participacion enlaza al PDF oficial.
+4. El boton Borrar demo ahora intenta borrar datos reales de Supabase, no solo estado local.
+5. Si el borrado muestra error RLS/DELETE, ejecutar en Supabase SQL Editor el archivo SUPABASE_POLITICAS_BORRADO_ADMIN.sql.
+
+DESPUES DE REEMPLAZAR LA CARPETA:
+- npm install
+- npm run dev
+- git add .
+- git commit -m "reglamento pdf y borrado real supabase"
+- git push origin main --force
+
+
+
+CAMBIOS FINALES APLICADOS - VERSION 100% SUPABASE
+-------------------------------------------------
+1. Participantes, ganadores, autorizaciones, auditoría, backups, premios y configuración se leen desde Supabase.
+2. Se eliminó la dependencia de datos locales para métricas, ranking, compras y premios.
+3. Al iniciar el aplicativo se limpia caché local del navegador para evitar datos viejos.
+4. El botón "Borrar demo" ahora consulta IDs reales y elimina por lotes directamente en Supabase.
+5. Al borrar demo se actualizan los estados del aplicativo y se vuelve a consultar Supabase.
+6. La configuración administrativa, usuario y clave quedan centralizados en configuracion_campana.
+7. Los backups se guardan en la tabla backups_campana además de descargarse como JSON.
+8. Se agregó recarga automática cada 15 segundos y al volver a enfocar la ventana para que otros dispositivos se sincronicen.
+
+IMPORTANTE:
+- En Vercel deben quedar configuradas las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.
+- Si el borrado falla, ejecutar SUPABASE_POLITICAS_BORRADO_ADMIN.sql en Supabase SQL Editor.
+- Después de subir a GitHub, esperar el deployment Ready en Vercel y probar en incógnito.
+
+
+ACTUALIZACIÓN FACTURA ÚNICA:
+- La ruleta pública solo muestra el participante registrado en ese dispositivo.
+- Cada factura solo puede girar una vez.
+- Antes de girar se valida en Supabase si esa factura ya existe en ganadores.
+- Después del giro las oportunidades quedan en 0.
+- Se incluye SUPABASE_BLOQUEO_FACTURA_UNICA.sql para blindaje adicional en base de datos.
+
+IMPORTANTE VERSION FINAL:
+- Ejecutar en Supabase el archivo SUPABASE_RESET_TOTAL_CAMPANA.sql una sola vez.
+- El boton Borrar demo llama la funcion reset_campana_demo para limpiar participantes, ganadores y autorizaciones en todos los dispositivos.
+- La pantalla publica ya no muestra ventas/clientes globales. Esos datos quedan solo en Admin.
+- La ruleta no permite girar si la factura ya jugo o no tiene oportunidades.

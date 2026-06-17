@@ -1,0 +1,27 @@
+CAMBIO IMPLEMENTADO - FACTURAS SIN GUION Y CONTROL DE FACTURA MINIMA
+
+1. Nomenclatura nueva para clientes:
+   FE28501
+   FD9101
+   STFD3201
+
+   El sistema ya no muestra FE- / FD- / STFD- en los textos ni placeholder.
+   Si un cliente escribe por error FE-28501, el sistema lo normaliza internamente a FE28501.
+
+2. Nuevo control en Administrador:
+   - Ultima factura FE antes de campaña
+   - Ultima factura FD antes de campaña
+   - Ultima factura STFD antes de campaña
+
+   Regla aplicada: Opción B.
+   Si FE = 28500, la primera factura válida es FE28501.
+   Cualquier FE28500 o inferior no participa.
+
+3. Lo demás se conserva igual:
+   - Supabase
+   - Vercel
+   - oportunidades múltiples
+   - reglamento PDF
+   - factura única
+   - borrado demo
+   - admin
