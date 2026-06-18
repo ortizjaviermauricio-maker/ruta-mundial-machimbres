@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './styles.css';
 import { supabase } from './supabase';
 
@@ -67,6 +67,28 @@ function nombrePublico(participante) {
   return apellido ? `${nombre} ${apellido.charAt(0)}.` : nombre;
 }
 
+function claveNombrePatrocinador(nombre) {
+  return String(nombre || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function deduplicarPatrocinadores(lista = []) {
+  const vistos = new Set();
+  return [...lista]
+    .sort((a, b) => Number(a.orden || 99) - Number(b.orden || 99))
+    .filter((p) => {
+      const clave = claveNombrePatrocinador(p.nombre || p.empresa || '');
+      if (!clave) return false;
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
+}
+
 export default function App() {
   const initial = useMemo(() => safeLoad(), []);
   const [vista, setVista] = useState('Inicio');
@@ -77,6 +99,9 @@ export default function App() {
   const [config, setConfig] = useState(initial.config || CONFIG_BASE);
   const [cambios, setCambios] = useState(initial.cambios || []);
   const [backups, setBackups] = useState(initial.backups || []);
+  const [patrocinadores, setPatrocinadores] = useState([]);
+  const [patrocinadorForm, setPatrocinadorForm] = useState({ nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', banner_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 });
+  const contenidoRef = useRef(null);
   const [adminUser, setAdminUser] = useState(initial.adminUser || 'admin');
   const [adminPass, setAdminPass] = useState(initial.adminPass || 'Mym2026*');
   const [adminOk, setAdminOk] = useState(false);
@@ -95,6 +120,7 @@ export default function App() {
     valorCompra: '',
     vendedor: '',
     autorizacion: false,
+    patrocinadorIds: [],
   });
 
   function mapPremio(p) {
@@ -106,6 +132,7 @@ export default function App() {
       probabilidad: Number(p.peso ?? p.probabilidad ?? 1),
       visible: p.visible_cliente ?? p.visible ?? true,
       ilimitado: p.entrega_premio === false || p.ilimitado === true,
+      patrocinadorId: p.patrocinador_id || p.patrocinadorId || '',
     };
   }
 
@@ -126,6 +153,14 @@ export default function App() {
       oportunidades: Number(p.oportunidades ?? 0),
       puntos: Number(p.puntos ?? 0),
       autorizacion: true,
+      patrocinadorId: p.patrocinador_id || p.patrocinadorId || '',
+      patrocinadorIds: Array.isArray(p.patrocinadores_ids)
+        ? p.patrocinadores_ids.map(String)
+        : String(p.patrocinadores_ids || p.patrocinadoresIds || p.patrocinador_id || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean),
+      marcaCompra: p.marca_compra || p.marcaCompra || '',
     };
   }
 
@@ -138,6 +173,25 @@ export default function App() {
       sede: g.sede || '',
       premio: g.premio || '',
       estado: g.estado || g.nota || 'Pendiente validación',
+    };
+  }
+
+  function mapPatrocinador(p) {
+    return {
+      id: p.id,
+      nombre: p.nombre || p.empresa || 'Aliado',
+      empresa: p.empresa || p.nombre || 'Aliado',
+      responsable: p.responsable || '',
+      telefono: p.telefono || '',
+      correo: p.correo || '',
+      logo_url: p.logo_url || p.logoUrl || '',
+      banner_url: p.banner_url || p.bannerUrl || '',
+      pagina_web: p.pagina_web || p.paginaWeb || '',
+      instagram: p.instagram || '',
+      whatsapp: p.whatsapp || p.telefono || '',
+      activo: p.activo !== false,
+      orden: Number(p.orden || 99),
+      fecha_creacion: p.fecha_creacion || p.created_at || '',
     };
   }
 
@@ -155,17 +209,24 @@ export default function App() {
   }
 
   async function cargarDatosSupabase() {
-    const [premiosRes, participantesRes, ganadoresRes, cambiosRes, configRes, backupsRes] = await Promise.all([
+    const [premiosRes, participantesRes, ganadoresRes, cambiosRes, configRes, backupsRes, patrocinadoresRes] = await Promise.all([
       supabase.from('premios').select('*').eq('activo', true),
       supabase.from('participantes').select('*').order('fecha', { ascending: false }),
       supabase.from('ganadores').select('*').order('fecha', { ascending: false }),
       supabase.from('auditoria_admin').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('configuracion_campana').select('*').eq('key', 'principal').maybeSingle(),
       supabase.from('backups_campana').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('patrocinadores').select('*').order('orden', { ascending: true }),
     ]);
 
     if (!premiosRes.error) setPremios((premiosRes.data || []).map(mapPremio));
     else console.error('Error cargando premios:', premiosRes.error.message);
+
+    if (!patrocinadoresRes.error) setPatrocinadores(deduplicarPatrocinadores((patrocinadoresRes.data || []).map(mapPatrocinador)));
+    else {
+      console.warn('Patrocinadores no activos todavía. Ejecute SUPABASE_PATROCINADORES_V2.sql:', patrocinadoresRes.error.message);
+      setPatrocinadores([]);
+    }
 
     if (!participantesRes.error) setParticipantes((participantesRes.data || []).map(mapParticipante));
     else console.error('Error cargando participantes:', participantesRes.error.message);
@@ -231,6 +292,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ganadores' }, cargarDatosSupabase)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'autorizaciones_datos' }, cargarDatosSupabase)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'premios' }, cargarDatosSupabase)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patrocinadores' }, cargarDatosSupabase)
       .subscribe();
 
     return () => {
@@ -239,6 +301,12 @@ export default function App() {
       supabase.removeChannel(canal);
     };
   }, []);
+
+  useEffect(() => {
+    window.setTimeout(() => {
+      contenidoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }, [vista]);
 
   useEffect(() => {
     if (!participanteLocalId) return;
@@ -329,6 +397,51 @@ export default function App() {
     });
     return Object.values(map).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   }, [participantes]);
+
+  const patrocinadoresActivos = useMemo(() =>
+    deduplicarPatrocinadores(patrocinadores).filter((p) => p.activo !== false),
+    [patrocinadores]
+  );
+
+  const ventasPorPatrocinador = useMemo(() => {
+    return patrocinadoresActivos.map((patrocinador) => {
+      const asociados = participantes.filter((p) => {
+        const ids = Array.isArray(p.patrocinadorIds) ? p.patrocinadorIds.map(String) : String(p.patrocinadoresIds || p.patrocinadorId || '').split(',').map((x) => x.trim()).filter(Boolean);
+        return ids.includes(String(patrocinador.id));
+      });
+      const total = asociados.reduce((sum, p) => sum + Number(p.valorCompra || 0), 0);
+      const premiosEntregados = ganadores.filter((g) => asociados.some((p) => normalizarFactura(p.factura) === normalizarFactura(g.factura)) && g.premio !== 'Sigue intentando').length;
+      return {
+        patrocinador: patrocinador.nombre,
+        facturas: asociados.length,
+        ventas: total,
+        ventas_formato: money(total),
+        premios_entregados: premiosEntregados,
+      };
+    }).filter((r) => r.facturas > 0 || r.premios_entregados > 0);
+  }, [patrocinadoresActivos, participantes, ganadores]);
+
+  function nombrePatrocinador(id) {
+    const p = patrocinadores.find((item) => String(item.id) === String(id));
+    return p?.nombre || 'marca aliada';
+  }
+
+  function togglePatrocinadorRegistro(id) {
+    const sid = String(id);
+    setForm((prev) => {
+      const actuales = Array.isArray(prev.patrocinadorIds) ? prev.patrocinadorIds.map(String) : [];
+      const existe = actuales.includes(sid);
+      return {
+        ...prev,
+        patrocinadorIds: existe ? actuales.filter((x) => x !== sid) : [...actuales, sid],
+      };
+    });
+  }
+
+  function nombresPatrocinadores(ids = []) {
+    const lista = (Array.isArray(ids) ? ids : String(ids || '').split(',')).map(String).filter(Boolean);
+    return lista.map((id) => nombrePatrocinador(id)).join(', ');
+  }
 
   function sello() {
     return new Date().toLocaleString('es-CO', { hour12: false });
@@ -439,6 +552,8 @@ export default function App() {
 
     const oportunidades = calcularOportunidades(valorCompra);
     const puntos = oportunidades * Number(config.puntosPorOportunidad || 0);
+    const patrocinadorIdsSeleccionados = Array.isArray(form.patrocinadorIds) ? form.patrocinadorIds.map(String) : [];
+    const patrocinadoresSeleccionados = patrocinadores.filter((p) => patrocinadorIdsSeleccionados.includes(String(p.id)));
     const insertData = {
       nombre: form.nombre.trim(),
       taller: form.apellido.trim(),
@@ -454,9 +569,19 @@ export default function App() {
       oportunidades,
       version_reglamento: config.reglamento,
       version_autorizacion: config.autorizacion,
+      patrocinador_id: patrocinadorIdsSeleccionados[0] || null,
+      patrocinadores_ids: patrocinadorIdsSeleccionados.join(','),
+      marca_compra: patrocinadoresSeleccionados.map((p) => p.nombre).join(', '),
     };
 
-    const { data, error } = await supabase.from('participantes').insert(insertData).select().single();
+    let { data, error } = await supabase.from('participantes').insert(insertData).select().single();
+    if (error && String(error.message || '').toLowerCase().includes('column')) {
+      const { patrocinador_id, patrocinadores_ids, marca_compra, ...insertDataBasico } = insertData;
+      const retry = await supabase.from('participantes').insert(insertDataBasico).select().single();
+      data = retry.data;
+      error = retry.error;
+      if (!error) console.warn('Registro guardado sin patrocinador. Ejecute SUPABASE_PATROCINADORES_V2.sql para activar medición por patrocinador.');
+    }
     if (error) {
       alert('No se pudo guardar el participante en Supabase: ' + error.message);
       return;
@@ -496,6 +621,7 @@ export default function App() {
       factura: '',
       valorCompra: '',
       vendedor: '',
+      patrocinadorIds: [],
       autorizacion: false,
     });
     setVista('Ruleta');
@@ -524,7 +650,17 @@ export default function App() {
       return;
     }
 
-    const activos = premios.filter((p) => Number(p.probabilidad) > 0 && (p.ilimitado || Number(p.stock) > 0));
+    const patrocinadoresParticipante = Array.isArray(participanteSeleccionado?.patrocinadorIds)
+      ? participanteSeleccionado.patrocinadorIds.map(String)
+      : String(participanteSeleccionado?.patrocinadoresIds || participanteSeleccionado?.patrocinadorId || '')
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+    const activos = premios.filter((p) => {
+      const premioPatrocinador = p.patrocinadorId ? String(p.patrocinadorId) : '';
+      const aplicaPatrocinador = !premioPatrocinador || patrocinadoresParticipante.includes(premioPatrocinador);
+      return aplicaPatrocinador && Number(p.probabilidad) > 0 && (p.ilimitado || Number(p.stock) > 0);
+    });
     if (!activos.length) {
       alert('No hay premios configurados.');
       return;
@@ -634,12 +770,130 @@ export default function App() {
     alert('Clave administrativa actualizada correctamente en Supabase.');
   }
 
+
+  function leerArchivoComoDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function cargarLogoPatrocinador(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('El logo debe ser una imagen PNG, JPG o SVG.');
+      return;
+    }
+    if (file.size > 700000) {
+      alert('El logo es muy pesado. Use una imagen menor a 700 KB para que cargue rápido en celulares.');
+      return;
+    }
+    const dataUrl = await leerArchivoComoDataUrl(file);
+    setPatrocinadorForm((prev) => ({ ...prev, logo_url: dataUrl }));
+  }
+
+  async function cargarBannerPatrocinador(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('El promocional debe ser una imagen.');
+      return;
+    }
+    if (file.size > 900000) {
+      alert('El promocional es muy pesado. Use una imagen menor a 900 KB.');
+      return;
+    }
+    const dataUrl = await leerArchivoComoDataUrl(file);
+    setPatrocinadorForm((prev) => ({ ...prev, banner_url: dataUrl }));
+  }
+
+  async function guardarPatrocinador(e) {
+    e.preventDefault();
+    if (!patrocinadorForm.nombre.trim()) {
+      alert('Digite el nombre del patrocinador.');
+      return;
+    }
+
+    const payload = {
+      nombre: patrocinadorForm.nombre.trim(),
+      empresa: patrocinadorForm.empresa.trim() || patrocinadorForm.nombre.trim(),
+      responsable: patrocinadorForm.responsable.trim(),
+      telefono: patrocinadorForm.telefono.trim(),
+      correo: patrocinadorForm.correo.trim(),
+      logo_url: patrocinadorForm.logo_url || '',
+      banner_url: patrocinadorForm.banner_url || '',
+      pagina_web: patrocinadorForm.pagina_web.trim(),
+      instagram: patrocinadorForm.instagram.trim(),
+      whatsapp: patrocinadorForm.whatsapp.trim(),
+      activo: Boolean(patrocinadorForm.activo),
+      orden: Number(patrocinadorForm.orden || 99),
+    };
+
+    const claveNueva = claveNombrePatrocinador(payload.nombre);
+    const existente = patrocinadores.find((p) => claveNombrePatrocinador(p.nombre || p.empresa) === claveNueva);
+
+    if (existente) {
+      const { data, error } = await supabase
+        .from('patrocinadores')
+        .update(payload)
+        .eq('id', existente.id)
+        .select()
+        .single();
+
+      if (error) {
+        alert('Este patrocinador ya existe, pero no se pudo actualizar. Detalle: ' + error.message);
+        return;
+      }
+
+      const actualizado = mapPatrocinador(data || { ...existente, ...payload });
+      setPatrocinadores((prev) =>
+        deduplicarPatrocinadores(prev.map((p) => String(p.id) === String(actualizado.id) ? actualizado : p))
+      );
+      setPatrocinadorForm({ nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', banner_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 });
+      registrarCambio('Patrocinador actualizado', `Se actualizó patrocinador existente ${actualizado.nombre}.`);
+      alert('El patrocinador ya existía. Se actualizó el registro existente y no se creó duplicado.');
+      return;
+    }
+
+    const { data, error } = await supabase.from('patrocinadores').insert(payload).select().single();
+    if (error) {
+      const mensaje = String(error.message || '').toLowerCase();
+      if (mensaje.includes('duplicate') || mensaje.includes('unique')) {
+        alert('Este patrocinador ya existe. Actualice el registro existente; no se permiten duplicados.');
+      } else {
+        alert('No se pudo guardar patrocinador. Ejecute SUPABASE_PATROCINADORES_V2.sql en Supabase. Detalle: ' + error.message);
+      }
+      await cargarDatosSupabase();
+      return;
+    }
+    const nuevo = mapPatrocinador(data);
+    setPatrocinadores((prev) => deduplicarPatrocinadores([...prev, nuevo]));
+    setPatrocinadorForm({ nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', banner_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 });
+    registrarCambio('Nuevo patrocinador', `Se agregó patrocinador ${nuevo.nombre}.`);
+  }
+
+  async function actualizarPatrocinador(id, campo, valor) {
+    const anterior = patrocinadores.find((p) => String(p.id) === String(id));
+    const nuevoValor = campo === 'activo' ? Boolean(valor) : campo === 'orden' ? Number(valor || 99) : valor;
+    setPatrocinadores((prev) => prev.map((p) => String(p.id) === String(id) ? { ...p, [campo]: nuevoValor } : p));
+    const { error } = await supabase.from('patrocinadores').update({ [campo]: nuevoValor }).eq('id', id);
+    if (error) {
+      alert('No se pudo actualizar patrocinador: ' + error.message);
+      await cargarDatosSupabase();
+      return;
+    }
+    registrarCambio('Cambio patrocinador', `${anterior?.nombre || id} / ${campo}: ${nuevoValor}`);
+  }
+
   async function actualizarPremio(id, campo, valor) {
     const premioActual = premios.find((p) => p.id === id);
     const anterior = premioActual ? premioActual[campo] : '';
     const nuevoValor = (campo === 'visible' || campo === 'ilimitado')
       ? Boolean(valor)
-      : (campo === 'nombre' || campo === 'categoria')
+      : (campo === 'nombre' || campo === 'categoria' || campo === 'patrocinadorId')
         ? valor
         : Number(valor);
 
@@ -654,6 +908,7 @@ export default function App() {
       visible_cliente: Boolean(actualizado.visible),
       entrega_premio: !Boolean(actualizado.ilimitado),
       activo: true,
+      patrocinador_id: actualizado.patrocinadorId || null,
     };
     const { error } = await supabase.from('premios').update(payload).eq('id', id);
     if (error) {
@@ -803,6 +1058,8 @@ export default function App() {
         const values = line.split(';').map((v) => v.replaceAll('"', '').trim());
         const row = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
         const nombre = row.nombre || row.premio || `Premio ${index + 1}`;
+        const patrocinadorNombre = String(row.patrocinador || row.aliado || '').trim().toLowerCase();
+        const patrocinador = patrocinadores.find((p) => p.nombre.toLowerCase() === patrocinadorNombre || p.empresa.toLowerCase() === patrocinadorNombre);
         const ilimitado = String(row.ilimitado || '').toLowerCase() === 'true' || nombre.toLowerCase().includes('sigue intentando');
         const visible = row.visible === undefined || row.visible === ''
           ? !nombre.toLowerCase().includes('sigue intentando')
@@ -815,6 +1072,7 @@ export default function App() {
           visible_cliente: visible,
           entrega_premio: !ilimitado,
           activo: true,
+          patrocinador_id: patrocinador?.id || null,
         };
       });
 
@@ -949,7 +1207,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="content">
+      <main className="content" ref={contenidoRef}>
         <section className="hero">
           <div className="heroText">
             <div className="heroLogos">
@@ -970,6 +1228,30 @@ export default function App() {
               <span>✅ DEKO LÁMINAS</span>
               <span>✅ DEKO DESIGN CENTER</span>
             </div>
+          </div>
+        </section>
+
+        <section className="sponsorStrip">
+          <div className="sponsorStripTitle">
+            <span>Aliados estratégicos de la campaña</span>
+            <small>Marcas patrocinadoras y beneficios especiales</small>
+          </div>
+          <div className="sponsorLogos">
+            {patrocinadoresActivos.length === 0 ? (
+              <span className="sponsorEmpty">Próximamente nuevos aliados</span>
+            ) : patrocinadoresActivos.map((p) => (
+              <a
+                key={p.id}
+                className="sponsorLogo"
+                href={p.pagina_web || p.instagram || (p.whatsapp ? `https://wa.me/${String(p.whatsapp).replace(/\D/g, '')}` : '#')}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => { if (!p.pagina_web && !p.instagram && !p.whatsapp) e.preventDefault(); }}
+                title={p.nombre}
+              >
+                {p.logo_url ? <img src={p.logo_url} alt={p.nombre} /> : <strong>{p.nombre}</strong>}
+              </a>
+            ))}
           </div>
         </section>
 
@@ -1025,6 +1307,23 @@ export default function App() {
                 <label>Factura*<input value={form.factura} onChange={(e) => setForm({ ...form, factura: e.target.value.toUpperCase() })} placeholder="FE28501 / FD9101 / STFD3201" /></label>
                 <label>Valor compra*<input type="number" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
                 <label>Vendedor<input value={form.vendedor} onChange={(e) => setForm({ ...form, vendedor: e.target.value })} /></label>
+                <div className="brandPicker">
+                  <strong>Marcas patrocinadoras compradas</strong>
+                  <small>Puede seleccionar una, varias o dejar sin marcar si la factura no incluye marcas patrocinadoras.</small>
+                  <div className="sponsorChecks">
+                    {patrocinadoresActivos.length === 0 && <span className="muted">No hay patrocinadores activos.</span>}
+                    {patrocinadoresActivos.map((p) => {
+                      const checked = (form.patrocinadorIds || []).map(String).includes(String(p.id));
+                      return (
+                        <label key={p.id} className={`sponsorCheck ${checked ? 'selected' : ''}`}>
+                          <input type="checkbox" checked={checked} onChange={() => togglePatrocinadorRegistro(p.id)} />
+                          {p.logo_url && <img src={p.logo_url} alt={p.nombre} />}
+                          <span>{p.nombre}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="calc">
@@ -1036,6 +1335,11 @@ export default function App() {
               <div className="methodBox">
                 Cada {money(config.valorPorOportunidad)} suma {config.puntosPorOportunidad} puntos y 1 oportunidad. Máximo {config.maxOportunidades} oportunidades por factura.
               </div>
+              {(form.patrocinadorIds || []).length > 0 && (
+                <div className="sponsorSelected">
+                  Participará también por premios patrocinados por <strong>{nombresPatrocinadores(form.patrocinadorIds)}</strong>, sujetos a disponibilidad y probabilidad interna.
+                </div>
+              )}
 
               <label className="privacy"><input type="checkbox" checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} /><span>Autorizo el tratamiento de mis datos personales y acepto el reglamento oficial de la campaña. <a href={REGLAMENTO_PDF} target="_blank" rel="noopener noreferrer">Ver PDF</a></span></label>
               <button className="primary big" type="submit">Registrarme y jugar</button>
@@ -1049,7 +1353,10 @@ export default function App() {
             {participantesDisponiblesRuleta.length > 0 ? (
               <div className="factura-activa">
                 <strong>Factura lista para jugar:</strong>
-                <span>{participantesDisponiblesRuleta[0].nombre} {participantesDisponiblesRuleta[0].apellido} · {participantesDisponiblesRuleta[0].factura} · {Number(participantesDisponiblesRuleta[0].oportunidades || 0)} giro(s) disponible(s)</span>
+                <span>{participantesDisponiblesRuleta[0].factura} · {Number(participantesDisponiblesRuleta[0].oportunidades || 0)} giro(s) disponible(s)</span>
+                {(participantesDisponiblesRuleta[0].patrocinadorIds || []).length > 0 && (
+                  <small className="sponsorPlayNotice">También participa por beneficios de {nombresPatrocinadores(participantesDisponiblesRuleta[0].patrocinadorIds)}</small>
+                )}
               </div>
             ) : (
               <p className="muted">No hay participantes disponibles para girar en este dispositivo. Registre una factura nueva o verifique que la factura no haya sido jugada.</p>
@@ -1172,10 +1479,25 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="card adminSubCard">
+                  <h2>Ventas por patrocinador / marca</h2>
+                  <div className="salesGrid">
+                    {ventasPorPatrocinador.length === 0 && <p className="muted">Aún no hay ventas asociadas a patrocinadores.</p>}
+                    {ventasPorPatrocinador.map((v) => (
+                      <div key={v.patrocinador}>
+                        <b>{v.patrocinador}</b>
+                        <strong>{money(v.total)}</strong>
+                        <span>{v.facturas} factura(s) · {v.puntos} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="adminGrid">
                   <button onClick={() => descargarExcel('participantes.xls', participantes, 'Participantes')}>Participantes Excel</button>
                   <button onClick={() => descargarExcel('ganadores.xls', ganadores, 'Ganadores')}>Ganadores Excel</button>
                   <button onClick={() => descargarExcel('ventas_por_sede.xls', ventasPorSede, 'VentasPorSede')}>Ventas Excel</button>
+                  <button onClick={() => descargarExcel('ventas_por_patrocinador.xls', ventasPorPatrocinador, 'VentasPorPatrocinador')}>Patrocinadores Excel</button>
                   <button onClick={() => descargarExcel('auditoria.xls', cambios, 'Auditoria')}>Auditoría Excel</button>
                   <button onClick={generarBackup}>Backup JSON</button>
                   <button onClick={restaurarPremiosBase}>Restaurar premios</button>
@@ -1211,12 +1533,53 @@ export default function App() {
                 </div>
 
                 <div className="card adminSubCard">
+                  <h2>Patrocinadores y aliados estratégicos</h2>
+                  <p className="muted">Los logos activos aparecen en el banner superior. Los premios asociados a un patrocinador solo entran en la ruleta cuando el cliente selecciona esa marca en el registro.</p>
+                  <form className="grid" onSubmit={guardarPatrocinador}>
+                    <label>Nombre patrocinador<input value={patrocinadorForm.nombre} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, nombre: e.target.value })} placeholder="Ecofort" /></label>
+                    <label>Empresa<input value={patrocinadorForm.empresa} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, empresa: e.target.value })} /></label>
+                    <label>Responsable<input value={patrocinadorForm.responsable} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, responsable: e.target.value })} /></label>
+                    <label>Teléfono / WhatsApp<input value={patrocinadorForm.whatsapp || patrocinadorForm.telefono} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, telefono: e.target.value, whatsapp: e.target.value })} /></label>
+                    <label>Correo<input value={patrocinadorForm.correo} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, correo: e.target.value })} /></label>
+                    <label>Página web<input value={patrocinadorForm.pagina_web} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, pagina_web: e.target.value })} /></label>
+                    <label>Instagram<input value={patrocinadorForm.instagram} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, instagram: e.target.value })} /></label>
+                    <label>Orden banner<input type="number" value={patrocinadorForm.orden} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, orden: e.target.value })} /></label>
+                    <label>Subir logo<input type="file" accept="image/*" onChange={cargarLogoPatrocinador} /></label>
+                    <label>Subir promocional<input type="file" accept="image/*" onChange={cargarBannerPatrocinador} /></label>
+                    <label className="checkLine"><input type="checkbox" checked={patrocinadorForm.activo} onChange={(e) => setPatrocinadorForm({ ...patrocinadorForm, activo: e.target.checked })} /> Activo en campaña</label>
+                    <button className="primary" type="submit">Guardar patrocinador</button>
+                  </form>
+
+                  {(patrocinadorForm.logo_url || patrocinadorForm.banner_url) && (
+                    <div className="sponsorPreview">
+                      {patrocinadorForm.logo_url && <img src={patrocinadorForm.logo_url} alt="Vista logo" />}
+                      {patrocinadorForm.banner_url && <img src={patrocinadorForm.banner_url} alt="Vista promocional" />}
+                    </div>
+                  )}
+
+                  <div className="tableWrap">
+                    <table>
+                      <thead><tr><th>Logo</th><th>Patrocinador</th><th>Contacto</th><th>Orden</th><th>Activo</th></tr></thead>
+                      <tbody>{deduplicarPatrocinadores(patrocinadores).map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.logo_url ? <img className="miniLogo" src={p.logo_url} alt={p.nombre} /> : 'Sin logo'}</td>
+                          <td><strong>{p.nombre}</strong><br /><small>{p.empresa}</small></td>
+                          <td><small>{p.responsable}<br />{p.telefono || p.whatsapp}<br />{p.correo}</small></td>
+                          <td><input type="number" value={p.orden || 99} onChange={(e) => actualizarPatrocinador(p.id, 'orden', e.target.value)} /></td>
+                          <td><input type="checkbox" checked={p.activo !== false} onChange={(e) => actualizarPatrocinador(p.id, 'activo', e.target.checked)} /></td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="card adminSubCard">
                   <h2>Premios y probabilidades internas</h2>
                   <p>Estos valores solo se ven en administración. El cliente no ve pesos ni probabilidades.</p>
                   <div className="tableWrap">
                     <table>
-                      <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad interna</th><th>Visible cliente</th><th>Ilimitado</th></tr></thead>
-                      <tbody>{premios.map((p) => <tr key={p.id}><td><input value={p.nombre} onChange={(e) => actualizarPremio(p.id, 'nombre', e.target.value)} /></td><td><input value={p.categoria} onChange={(e) => actualizarPremio(p.id, 'categoria', e.target.value)} /></td><td><input type="number" value={p.stock} onChange={(e) => actualizarPremio(p.id, 'stock', e.target.value)} /></td><td><input type="number" step="0.1" value={p.probabilidad} onChange={(e) => actualizarPremio(p.id, 'probabilidad', e.target.value)} /></td><td><input type="checkbox" checked={p.visible} onChange={(e) => actualizarPremio(p.id, 'visible', e.target.checked)} /></td><td><input type="checkbox" checked={p.ilimitado} onChange={(e) => actualizarPremio(p.id, 'ilimitado', e.target.checked)} /></td></tr>)}</tbody>
+                      <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad interna</th><th>Visible cliente</th><th>Ilimitado</th><th>Patrocinador</th></tr></thead>
+                      <tbody>{premios.map((p) => <tr key={p.id}><td><input value={p.nombre} onChange={(e) => actualizarPremio(p.id, 'nombre', e.target.value)} /></td><td><input value={p.categoria} onChange={(e) => actualizarPremio(p.id, 'categoria', e.target.value)} /></td><td><input type="number" value={p.stock} onChange={(e) => actualizarPremio(p.id, 'stock', e.target.value)} /></td><td><input type="number" step="0.1" value={p.probabilidad} onChange={(e) => actualizarPremio(p.id, 'probabilidad', e.target.value)} /></td><td><input type="checkbox" checked={p.visible} onChange={(e) => actualizarPremio(p.id, 'visible', e.target.checked)} /></td><td><input type="checkbox" checked={p.ilimitado} onChange={(e) => actualizarPremio(p.id, 'ilimitado', e.target.checked)} /></td><td><select value={p.patrocinadorId || ''} onChange={(e) => actualizarPremio(p.id, 'patrocinadorId', e.target.value)}><option value="">General</option>{patrocinadoresActivos.map((sp) => <option key={sp.id} value={sp.id}>{sp.nombre}</option>)}</select></td></tr>)}</tbody>
                     </table>
                   </div>
                 </div>

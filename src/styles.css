@@ -58,3 +58,196 @@ footer{display:flex;gap:20px;justify-content:center;background:white;margin:20px
 .docButton.secondary{background:#071a31}
 .legalWarning{background:#fff7e8;border:1px solid #ffcf99;border-radius:14px;padding:13px;margin-top:14px}
 .privacy a, footer a{color:#006b22;font-weight:1000;text-decoration:underline}
+
+
+/* ==== Patrocinadores / aliados estratégicos ==== */
+.sponsorStrip{
+  margin: -18px 24px 22px;
+  position: relative;
+  z-index: 5;
+  background: linear-gradient(90deg,#ffffff 0%,#fff8ef 45%,#eefaf2 100%);
+  border: 2px solid rgba(0,117,42,.18);
+  border-left: 8px solid var(--orange);
+  border-radius: 22px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 18px;
+  align-items: center;
+  box-shadow: 0 16px 35px rgba(16,24,40,.14);
+}
+.sponsorStripTitle span{
+  display:block;
+  color: var(--green);
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.sponsorStripTitle small{
+  display:block;
+  color:#667085;
+  font-weight:700;
+  margin-top:3px;
+}
+.sponsorLogos{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+.sponsorLogo{
+  min-width: 150px;
+  height: 82px;
+  border-radius: 18px;
+  background:#fff;
+  border:1px solid #e8edf4;
+  display:grid;
+  place-items:center;
+  padding:10px;
+  box-shadow:0 8px 20px rgba(16,24,40,.10);
+  text-decoration:none;
+  color:var(--green);
+  transition:.18s ease;
+}
+.sponsorLogo:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(16,24,40,.16)}
+.sponsorLogo img{max-width:100%;max-height:62px;object-fit:contain}
+.sponsorEmpty{font-weight:800;color:#667085}
+.sponsorSelected,.sponsorPlayNotice{
+  display:block;
+  background:#f0fff5;
+  border:1px solid rgba(0,117,42,.2);
+  border-left:5px solid var(--green);
+  padding:12px 14px;
+  border-radius:14px;
+  color:#174c29;
+  font-weight:800;
+  margin:12px 0;
+}
+.sponsorPrizeTag{
+  display:inline-block;
+  background:#fff3e0;
+  color:#9a4b00;
+  border-radius:999px;
+  padding:5px 10px;
+  font-weight:900;
+  margin:5px 0 8px;
+}
+.sponsorPreview{
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+  margin:14px 0;
+}
+.sponsorPreview img{
+  max-width:240px;
+  max-height:120px;
+  object-fit:contain;
+  background:#fff;
+  border:1px solid #e8edf4;
+  border-radius:14px;
+  padding:8px;
+}
+.miniLogo{
+  width:84px;
+  height:48px;
+  object-fit:contain;
+  background:#fff;
+  border:1px solid #edf1f5;
+  border-radius:10px;
+  padding:4px;
+}
+.checkLine{
+  display:flex!important;
+  gap:8px;
+  align-items:center;
+  font-weight:900;
+}
+.checkLine input{width:auto!important}
+
+@media(max-width:900px){
+  .sponsorStrip{
+    margin: -10px 12px 16px;
+    grid-template-columns:1fr;
+    gap:10px;
+    padding:14px;
+  }
+  .sponsorLogos{
+    gap:10px;
+    scroll-snap-type:x mandatory;
+  }
+  .sponsorLogo{
+    min-width:145px;
+    height:72px;
+    scroll-snap-align:start;
+  }
+  .heroLogos{
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .heroLogos img{width:230px;height:76px}
+}
+
+
+.brandPicker{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  grid-column:1/-1;
+  font-weight:900;
+}
+.brandPicker small{
+  color:#4b5563;
+  font-weight:500;
+}
+.sponsorChecks{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:10px;
+  margin-top:6px;
+}
+.sponsorCheck{
+  display:flex!important;
+  align-items:center;
+  gap:10px;
+  border:1px solid #d7e4d8;
+  border-radius:14px;
+  padding:10px 12px;
+  background:#fff;
+  cursor:pointer;
+  font-weight:900;
+  transition:.2s ease;
+}
+.sponsorCheck.selected{
+  border-color:#0b7a2a;
+  background:#edf9ef;
+  box-shadow:0 0 0 2px rgba(11,122,42,.12);
+}
+.sponsorCheck input{
+  width:auto!important;
+  accent-color:#0b7a2a;
+}
+.sponsorCheck img{
+  width:72px;
+  height:38px;
+  object-fit:contain;
+  background:#fff;
+  border-radius:8px;
+  border:1px solid #eef2f7;
+  padding:3px;
+}
+.sponsorSelected{
+  border:1px solid #b7e4c7;
+  background:#effaf2;
+  color:#075b22;
+  border-radius:14px;
+  padding:12px 14px;
+  margin:12px 0;
+  font-weight:700;
+}
+.sponsorPlayNotice{
+  display:block;
+  margin-top:6px;
+  color:#075b22;
+  font-weight:800;
+}
