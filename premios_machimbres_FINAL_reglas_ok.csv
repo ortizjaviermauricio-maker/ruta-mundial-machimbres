@@ -1,0 +1,14 @@
+﻿nombre;categoria;puntos_requeridos;stock;probabilidad;visible;limitado;patrocinador;aplica_si_marca;descripcion
+Sigue intentando;beneficio;10000;999999;92;FALSE;TRUE;General;;Resultado sin premio. No aparece como premio visible para el cliente.
+Sixpack;producto;100;29;4;TRUE;FALSE;General;;Premio general de campaña.
+Camiseta Selección;producto;1000;60;2;TRUE;FALSE;General;;Premio físico visible para clientes.
+Hielera Termolar 20lt con cerveza;producto;500;3;0.5;TRUE;FALSE;General;;Premio físico de campaña.
+Taladro;producto;5000;1;0.4;TRUE;FALSE;General;;Premio de baja probabilidad y stock limitado.
+Barra de sonido VTA;producto;1000;3;0.5;TRUE;FALSE;General;;Premio físico visible para clientes.
+Juego de Brocas Buaker;producto;1000;3;0.5;TRUE;FALSE;General;;Premio físico visible para clientes.
+Caja Para guardar Heramientas UBERMANN;producto;1000;3;0.4;TRUE;FALSE;General;;Premio físico visible para clientes.
+Primacor Bacatá 15mm RH;producto;1000;3;0.5;TRUE;FALSE;PRIMADERA;PRIMADERA;Premio patrocinado por PRIMADERA. Entra solo si el cliente marca PRIMADERA.
+Primacor Cocuy 15mm RH;producto;1000;2;0.5;TRUE;FALSE;PRIMADERA;PRIMADERA;Premio patrocinado por PRIMADERA. Entra solo si el cliente marca PRIMADERA.
+Bono 5% descuento próxima compra Ecofort;producto;100;10;0.5;TRUE;FALSE;ECOFORT;ECOFORT;Bono patrocinado por ECOFORT. Entra solo si el cliente marca ECOFORT.
+Bono 10% descuento próxima compra Ecofort;producto;100;10;0.5;TRUE;FALSE;ECOFORT;ECOFORT;Bono patrocinado por ECOFORT. Entra solo si el cliente marca ECOFORT.
+Lámina Ecofort referencia seleccionada por cliente;producto;1000;3;0.5;TRUE;FALSE;ECOFORT;ECOFORT;Premio patrocinado por ECOFORT sujeto a disponibilidad y validación. Entra solo si el cliente marca ECOFORT.

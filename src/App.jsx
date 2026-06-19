@@ -1043,38 +1043,98 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  function detectarSeparadorCSV(linea) {
+    const candidatos = [';', '\t', ','];
+    return candidatos
+      .map((sep) => ({ sep, count: (linea.match(new RegExp(sep === '\t' ? '\t' : `\\${sep}`, 'g')) || []).length }))
+      .sort((a, b) => b.count - a.count)[0].sep;
+  }
+
+  function parsearLineaCSV(linea, separador) {
+    const valores = [];
+    let actual = '';
+    let entreComillas = false;
+    for (let i = 0; i < linea.length; i += 1) {
+      const c = linea[i];
+      const siguiente = linea[i + 1];
+      if (c === '"' && siguiente === '"') {
+        actual += '"';
+        i += 1;
+      } else if (c === '"') {
+        entreComillas = !entreComillas;
+      } else if (c === separador && !entreComillas) {
+        valores.push(actual.trim());
+        actual = '';
+      } else {
+        actual += c;
+      }
+    }
+    valores.push(actual.trim());
+    return valores.map((v) => v.replace(/^\uFEFF/, '').replace(/^"|"$/g, '').trim());
+  }
+
+  function normalizarNumero(valor, defecto = 0) {
+    const limpio = String(valor ?? '').trim().replace(/\./g, '').replace(',', '.');
+    const num = Number(limpio);
+    return Number.isFinite(num) ? num : defecto;
+  }
+
+  function normalizarBoolean(valor, defecto = false) {
+    const limpio = String(valor ?? '').trim().toLowerCase();
+    if (['true', 'si', 'sí', '1', 'x', 'activo'].includes(limpio)) return true;
+    if (['false', 'no', '0', '', 'inactivo'].includes(limpio)) return false;
+    return defecto;
+  }
+
   function cargarPremiosCSV(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const lines = String(reader.result || '').split(/\r?\n/).filter(Boolean);
+      const contenido = String(reader.result || '').replace(/^\uFEFF/, '');
+      const lines = contenido.split(/\r?\n/).filter((line) => line.trim() !== '');
       if (lines.length < 2) {
         alert('El archivo está vacío.');
         return;
       }
-      const headers = lines[0].split(';').map((h) => h.trim().toLowerCase());
+
+      const separador = detectarSeparadorCSV(lines[0]);
+      const headers = parsearLineaCSV(lines[0], separador).map((h) => h.trim().toLowerCase());
+      const requiere = ['nombre', 'premio'];
+      if (!headers.some((h) => requiere.includes(h))) {
+        alert('El CSV debe incluir una columna llamada nombre o premio. Revise que el separador sea correcto.');
+        return;
+      }
+
       const nuevos = lines.slice(1).map((line, index) => {
-        const values = line.split(';').map((v) => v.replaceAll('"', '').trim());
-        const row = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
-        const nombre = row.nombre || row.premio || `Premio ${index + 1}`;
-        const patrocinadorNombre = String(row.patrocinador || row.aliado || '').trim().toLowerCase();
-        const patrocinador = patrocinadores.find((p) => p.nombre.toLowerCase() === patrocinadorNombre || p.empresa.toLowerCase() === patrocinadorNombre);
-        const ilimitado = String(row.ilimitado || '').toLowerCase() === 'true' || nombre.toLowerCase().includes('sigue intentando');
-        const visible = row.visible === undefined || row.visible === ''
-          ? !nombre.toLowerCase().includes('sigue intentando')
-          : String(row.visible).toLowerCase() === 'true';
+        const values = parsearLineaCSV(line, separador);
+        const row = Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']));
+        const nombre = String(row.nombre || row.premio || `Premio ${index + 1}`).trim();
+        const nombreNormalizado = nombre.toLowerCase();
+        const patrocinadorNombre = String(row.patrocinador || row.aliado || row.aplica_si_marca || '').trim().toLowerCase();
+        const esGeneral = !patrocinadorNombre || patrocinadorNombre === 'general' || patrocinadorNombre === 'ninguno';
+        const patrocinador = esGeneral
+          ? null
+          : patrocinadores.find((p) =>
+              String(p.nombre || '').trim().toLowerCase() === patrocinadorNombre ||
+              String(p.empresa || '').trim().toLowerCase() === patrocinadorNombre
+            );
+        const ilimitado = normalizarBoolean(row.ilimitado ?? row.limitado, false) || nombreNormalizado.includes('sigue intentando');
+        const visible = (row.visible === undefined || row.visible === '')
+          ? !nombreNormalizado.includes('sigue intentando')
+          : normalizarBoolean(row.visible, true);
+
         return {
           premio: nombre,
-          categoria: row.categoria || row.tipo || 'Premio',
-          cantidad: Number(row.stock || row.cantidad || 0),
-          peso: Number(row.probabilidad || row.peso || 1),
+          categoria: row.categoria || row.tipo || 'producto',
+          cantidad: normalizarNumero(row.stock || row.cantidad, 0),
+          peso: normalizarNumero(row.probabilidad || row.peso, 1),
           visible_cliente: visible,
           entrega_premio: !ilimitado,
           activo: true,
           patrocinador_id: patrocinador?.id || null,
         };
-      });
+      }).filter((p) => p.premio && p.premio.toLowerCase() !== 'premio');
 
       const seguro = confirm(`Se reemplazarán los premios actuales en Supabase por ${nuevos.length} premios del CSV. ¿Continuar?`);
       if (!seguro) return;
@@ -1093,7 +1153,7 @@ export default function App() {
       registrarCambio('Carga de premios CSV', `Se cargó el archivo ${file.name} con ${nuevos.length} premios en Supabase.`);
       alert('Premios cargados correctamente en Supabase. Ya se verán igual en otros computadores.');
     };
-    reader.readAsText(file, 'utf-8');
+    reader.readAsText(file, 'latin1');
     event.target.value = '';
   }
 
@@ -1365,8 +1425,7 @@ export default function App() {
             <button className="primary big" disabled={!participantePuedeGirar || participantesDisponiblesRuleta.length === 0} onClick={girar}>Girar ruleta</button>
             {resultado && (() => {
               const nombreResultado = String(resultado?.nombre || '').trim();
-              const categoriaResultado = String(resultado?.categoria || '').trim().toLowerCase();
-              const esSigueIntentando = nombreResultado.toLowerCase() === 'sigue intentando' || categoriaResultado === 'sin premio' || categoriaResultado === 'beneficio';
+              const esSigueIntentando = nombreResultado.toLowerCase() === 'sigue intentando';
               return (
                 <div className={esSigueIntentando ? 'winner noPrize' : 'winner prizeWin'}>
                   <h3>{esSigueIntentando ? 'Sigue intentando' : '¡Felicitaciones!'}</h3>
