@@ -341,10 +341,37 @@ export default function App() {
     };
   }, [participantes, ganadores]);
 
-  const ranking = useMemo(
-    () => [...participantes].sort((a, b) => Number(b.puntos || 0) - Number(a.puntos || 0)),
-    [participantes]
-  );
+  const ranking = useMemo(() => {
+    const normalizar = (txt) => String(txt || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const map = new Map();
+
+    participantes.forEach((p) => {
+      const clave = normalizar(p.celular) || normalizar(p.correo) || `${normalizar(p.nombre)}-${normalizar(p.apellido)}`;
+      if (!clave) return;
+      const factura = String(p.factura || '').trim().toUpperCase();
+
+      if (!map.has(clave)) {
+        map.set(clave, {
+          id: clave,
+          nombre: p.nombre || '',
+          apellido: p.apellido || '',
+          celular: p.celular || '',
+          correo: p.correo || '',
+          sede: p.sede || '',
+          puntos: 0,
+          valorCompra: 0,
+          facturas: [],
+        });
+      }
+
+      const item = map.get(clave);
+      item.puntos += Number(p.puntos || 0);
+      item.valorCompra += Number(p.valorCompra || 0);
+      if (factura && !item.facturas.includes(factura)) item.facturas.push(factura);
+    });
+
+    return [...map.values()].sort((a, b) => Number(b.puntos || 0) - Number(a.puntos || 0));
+  }, [participantes]);
 
   const participanteSeleccionado = participantes.find((p) => String(p.id) === String(seleccionado));
   const facturaSeleccionada = String(participanteSeleccionado?.factura || '').trim().toUpperCase();
@@ -656,7 +683,16 @@ export default function App() {
           .split(',')
           .map((x) => x.trim())
           .filter(Boolean);
+    const yaGanoPremioRealEstaFactura = ganadores.some((g) =>
+      String(g.factura || '').trim().toUpperCase() === facturaActual &&
+      String(g.premio || '').trim().toLowerCase() !== 'sigue intentando'
+    );
+
     const activos = premios.filter((p) => {
+      const nombrePremio = String(p.nombre || '').trim().toLowerCase();
+      if (yaGanoPremioRealEstaFactura) {
+        return nombrePremio === 'sigue intentando' && Number(p.probabilidad) > 0;
+      }
       const premioPatrocinador = p.patrocinadorId ? String(p.patrocinadorId) : '';
       const aplicaPatrocinador = !premioPatrocinador || patrocinadoresParticipante.includes(premioPatrocinador);
       return aplicaPatrocinador && Number(p.probabilidad) > 0 && (p.ilimitado || Number(p.stock) > 0);
@@ -1445,7 +1481,7 @@ export default function App() {
           <section className="card readable">
             <h2>Ranking acumulado</h2>
             {ranking.length === 0 && <p>Aún no hay participantes.</p>}
-            {ranking.map((p, i) => <div className="rankRow" key={p.id}><b>#{i + 1}</b><div><strong>{p.nombre} {p.apellido}</strong><small>{p.factura} · {money(p.valorCompra)} · {p.sede}</small></div><strong>{p.puntos} pts</strong></div>)}
+            {ranking.map((p, i) => <div className="rankRow" key={p.id}><b>#{i + 1}</b><div><strong>{p.nombre} {p.apellido}</strong><small>{p.facturas.length} factura(s) · {p.facturas.join(', ')}</small></div><strong>{p.puntos} pts</strong></div>)}
           </section>
         )}
 
@@ -1464,9 +1500,9 @@ export default function App() {
             <ul>
               <li>Compra mínima configurable desde administración: {money(config.compraMinima)}.</li>
               <li>Por cada {money(config.valorPorOportunidad)} recibe 1 oportunidad.</li>
-              <li>Cada oportunidad suma {config.puntosPorOportunidad} puntos.</li>
+              <li>Cada oportunidad suma {config.puntosPorOportunidad} puntos para el ranking acumulado.</li>
               <li>Prefijos válidos: FE, FD y STFD. Digite sin guion, ejemplo FE28501.</li>
-              <li>La probabilidad de premios es interna y no se muestra al cliente.</li>
+              <li>Si la factura incluye una o varias marcas aliadas, seleccione esas marcas para participar también por sus premios patrocinados.</li>
             </ul>
           </section>
         )}
