@@ -759,7 +759,19 @@ export default function App() {
         premio: ganadorDb.premio,
       };
       setGanadores((prev) => [ganadorLocal, ...prev]);
-      setSeleccionado('');
+
+      // IMPORTANTE: una factura puede tener varios giros.
+      // Si ya ganó un premio real, los giros restantes NO se bloquean;
+      // simplemente quedan disponibles y en los siguientes giros se fuerza "Sigue intentando".
+      if (nuevasOportunidades > 0) {
+        setSeleccionado(String(participanteSeleccionado.id));
+        setParticipanteLocalId(String(participanteSeleccionado.id));
+        localStorage.setItem('participante_actual_id', String(participanteSeleccionado.id));
+        localStorage.setItem('participante_actual_factura', String(participanteSeleccionado.factura || ''));
+      } else {
+        setSeleccionado('');
+      }
+
       setGirando(false);
       await cargarDatosSupabase();
     }, 900);
