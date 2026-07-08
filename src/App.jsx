@@ -375,16 +375,45 @@ export default function App() {
 
   const participanteSeleccionado = participantes.find((p) => String(p.id) === String(seleccionado));
   const facturaSeleccionada = String(participanteSeleccionado?.factura || '').trim().toUpperCase();
+
+  function girosUsadosFactura(factura) {
+    const facturaNormalizada = normalizarFactura(factura || '');
+    if (!facturaNormalizada) return 0;
+    return ganadores.filter((g) => normalizarFactura(g.factura || '') === facturaNormalizada).length;
+  }
+
+  function oportunidadesTotalesFactura(participante) {
+    if (!participante) return 0;
+    const girosUsados = girosUsadosFactura(participante.factura);
+    const porValor = calcularOportunidades(Number(participante.valorCompra || 0));
+    const porPuntos = Number(config.puntosPorOportunidad || 0) > 0
+      ? Math.round(Number(participante.puntos || 0) / Number(config.puntosPorOportunidad || 1))
+      : 0;
+    const iniciales = Number(participante.oportunidadesIniciales || 0);
+    const guardadasMasUsadas = Number(participante.oportunidades || 0) + girosUsados;
+
+    // Regla de protección: los giros disponibles se calculan con el mayor dato confiable.
+    // Así una factura no pierde giros por valores viejos en Supabase o por una configuración temporal en 0.
+    return Math.max(porValor, porPuntos, iniciales, guardadasMasUsadas, 0);
+  }
+
+  function girosRestantesFactura(participante) {
+    if (!participante) return 0;
+    const total = oportunidadesTotalesFactura(participante);
+    const usados = girosUsadosFactura(participante.factura);
+    return Math.max(0, total - usados);
+  }
+
   const participantePuedeGirar = Boolean(
-    participanteSeleccionado && Number(participanteSeleccionado.oportunidades || 0) > 0 && !girando
+    participanteSeleccionado && girosRestantesFactura(participanteSeleccionado) > 0 && !girando
   );
 
   const participantesDisponiblesRuleta = useMemo(() => {
     if (!participanteLocalId) return [];
     return participantes.filter((p) =>
-      String(p.id) === String(participanteLocalId) && Number(p.oportunidades || 0) > 0
+      String(p.id) === String(participanteLocalId) && girosRestantesFactura(p) > 0
     );
-  }, [participantes, participanteLocalId]);
+  }, [participantes, participanteLocalId, ganadores, config.valorPorOportunidad, config.maxOportunidades, config.puntosPorOportunidad]);
 
   useEffect(() => {
     if (participantesDisponiblesRuleta.length === 1 && String(seleccionado) !== String(participantesDisponiblesRuleta[0].id)) {
@@ -398,7 +427,7 @@ export default function App() {
   useEffect(() => {
     if (!seleccionado) return;
     const actual = participantes.find((p) => String(p.id) === String(seleccionado));
-    if (!actual || Number(actual.oportunidades || 0) <= 0) {
+    if (!actual || girosRestantesFactura(actual) <= 0) {
       setSeleccionado('');
     }
   }, [participantes, seleccionado]);
@@ -670,7 +699,8 @@ export default function App() {
       alert('La factura no es válida.');
       return;
     }
-    if (Number(participanteSeleccionado.oportunidades || 0) <= 0) {
+    const girosRestantesAntesDeGirar = girosRestantesFactura(participanteSeleccionado);
+    if (girosRestantesAntesDeGirar <= 0) {
       alert('Esta factura no tiene giros disponibles.');
       setSeleccionado('');
       await cargarDatosSupabase();
@@ -714,7 +744,7 @@ export default function App() {
     setTimeout(async () => {
       const premio = bolsa[Math.floor(Math.random() * bolsa.length)];
       setResultado(premio);
-      const nuevasOportunidades = Math.max(0, Number(participanteSeleccionado.oportunidades || 0) - 1);
+      const nuevasOportunidades = Math.max(0, girosRestantesAntesDeGirar - 1);
 
       setParticipantes((prev) =>
         prev.map((p) =>
@@ -1461,7 +1491,7 @@ export default function App() {
             {participantesDisponiblesRuleta.length > 0 ? (
               <div className="factura-activa">
                 <strong>Factura lista para jugar:</strong>
-                <span>{participantesDisponiblesRuleta[0].factura} · {Number(participantesDisponiblesRuleta[0].oportunidades || 0)} giro(s) disponible(s)</span>
+                <span>{participantesDisponiblesRuleta[0].factura} · {girosRestantesFactura(participantesDisponiblesRuleta[0])} giro(s) disponible(s)</span>
                 {(participantesDisponiblesRuleta[0].patrocinadorIds || []).length > 0 && (
                   <small className="sponsorPlayNotice">También participa por beneficios de {nombresPatrocinadores(participantesDisponiblesRuleta[0].patrocinadorIds)}</small>
                 )}
