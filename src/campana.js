@@ -1,11 +1,9 @@
-// Todo lo que cambia de una campaña a otra está aquí. La marca no debe quedar repartida en los componentes.
+// Todo lo que cambia de una campaña a otra está aquí y en los colores de styles.css.
 export const CAMPANA = {
   nombre: '39 años Machimbres y Maderas',
-  tituloLinea1: 'CELEBRAMOS',
-  tituloLinea2: '39 AÑOS',
-  tituloDestacado: 'CONTIGO',
-  lema: 'COMPRA • REGISTRA • GIRA • GANA',
-  ruleta: 'Ruleta de los 39 años',
+  desde: 'DESDE 1987',
+  titular: '39 ANILLOS DE HISTORIA',
+  invitacion: 'Celebra con nosotros. Compra, gira y gana.',
   // Copie aquí la ruta del PDF aprobado por el asesor legal, por ejemplo '/Reglamento_39_Anos.pdf'.
   reglamentoPdf: '',
 };
@@ -18,4 +16,16 @@ export const SEDES_RESPALDO = [
 
 export function money(valor) {
   return Number(valor || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+}
+
+// El registro pide un solo campo; el servidor guarda nombre y apellido por separado para el ranking.
+export function separarNombre(completo) {
+  const partes = String(completo || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length < 2) return { nombre: partes[0] || '', apellido: '' };
+  return { nombre: partes.slice(0, -1).join(' '), apellido: partes[partes.length - 1] };
+}
+
+// Vuelta final de la ruleta: suma giros completos desde la posición actual. Es solo visual; el servidor decide.
+export function siguienteRotacion(actual, azar = Math.random()) {
+  return actual + 360 * 6 + Math.floor(azar * 360);
 }

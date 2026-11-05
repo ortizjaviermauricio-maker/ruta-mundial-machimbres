@@ -3,7 +3,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "node ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/csv.test.mjs",
+    "test": "node --test tests/csv.test.mjs tests/campana.test.mjs",
     "test:db": "bash tests/db/correr.sh"
   },
   "dependencies": {
