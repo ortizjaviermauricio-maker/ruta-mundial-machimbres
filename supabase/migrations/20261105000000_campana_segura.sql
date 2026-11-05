@@ -647,6 +647,29 @@ begin
 end;
 $$;
 
+-- Historial automático de cambios hechos por el personal; los giros públicos no lo llenan.
+create function public._registrar_cambio_premio() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_campo text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  foreach v_campo in array array['premio', 'categoria', 'cantidad', 'peso', 'visible_cliente', 'entrega_premio', 'patrocinador_id']
+  loop
+    if (to_jsonb(old)->>v_campo) is distinct from (to_jsonb(new)->>v_campo) then
+      insert into public.historial_premios (premio_id, premio, campo_modificado, valor_anterior, valor_nuevo, usuario)
+      values (new.id, new.premio, v_campo, to_jsonb(old)->>v_campo, to_jsonb(new)->>v_campo, public.correo_actual());
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+create trigger premios_historial after update on public.premios
+for each row execute function public._registrar_cambio_premio();
+
 -- ============ Ejecución de funciones ============
 
 do $$
