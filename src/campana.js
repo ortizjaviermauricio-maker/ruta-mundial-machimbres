@@ -1,8 +1,8 @@
 // Todo lo que cambia de una campaña a otra está aquí y en los colores de styles.css.
 export const CAMPANA = {
-  nombre: '39 años Machimbres y Maderas',
+  nombre: 'Cada lámina cuenta',
   desde: 'DESDE 1987',
-  titular: 'ESTAMOS DE ANIVERSARIO',
+  titular: 'CADA LÁMINA CUENTA',
   subtitulo: '39 AÑOS SIENDO PARTE DE TUS PROYECTOS',
   invitacion: 'Compra, registra tu factura y gira la ruleta.',
   compromiso: 'Invertimos en tecnología y capacitación para entregarte el mejor producto transformado y darle mayor valor a tus proyectos.',

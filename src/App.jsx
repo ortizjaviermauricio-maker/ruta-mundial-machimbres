@@ -146,8 +146,8 @@ export default function App() {
 
 function Inicio({ config, patrocinadores, alParticipar }) {
   return (
-    <div className="cuerpo oscuro centrado">
-      <h1 className="titular" style={{ fontSize: 44 }}>{CAMPANA.titular}</h1>
+    <div className="cuerpo oscuro centrado inicio">
+      <h1 className="titular" style={{ fontSize: 52 }}>{CAMPANA.titular}</h1>
       <p className="titular acento" style={{ fontSize: 25 }}>{CAMPANA.subtitulo}</p>
       <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
