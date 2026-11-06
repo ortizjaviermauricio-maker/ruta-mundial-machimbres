@@ -228,7 +228,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           </label>
           <div className="dos">
             <label>Factura<input id="factura" required placeholder={`${prefijo}32150`} autoCapitalize="characters" value={form.factura} onChange={(e) => setForm({ ...form, factura: e.target.value.toUpperCase() })} /></label>
-            <label>Valor<input id="valor" required type="number" inputMode="numeric" min="0" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
+            <label>Valor exacto<input id="valor" required type="number" inputMode="numeric" min="0" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
           </div>
           {patrocinadores.length > 0 && (
             <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
@@ -249,6 +249,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
               <strong>{giros} {giros === 1 ? 'GIRO' : 'GIROS'}</strong>
             </div>
           )}
+          <p className="nota" style={{ fontSize: 14 }}>Registra los datos tal como aparecen en tu factura. La presentarás para reclamar tu premio.</p>
           <label className="casilla">
             <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
             <span>Acepto el tratamiento de datos personales y el reglamento de la campaña.{' '}
@@ -344,7 +345,7 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
         <strong>{resultado.premio}</strong>
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
-      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
+      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
       {resultado.restantes > 0
         ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>SEGUIR GIRANDO</button>
         : <button type="button" className="boton oscuro-b empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>}
@@ -442,7 +443,8 @@ function ComoFunciona({ config, sedes }) {
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
           <li>Cada giro suma {config.puntosPorOportunidad} puntos para el ranking.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
-          <li>La caja valida tu factura antes de habilitar los giros.</li>
+          <li>Cada factura se registra una sola vez y gira de inmediato.</li>
+          <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>
         </ul>
       </div>
     </>

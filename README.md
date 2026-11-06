@@ -16,7 +16,7 @@ Aplique `supabase/migrations/` en orden en un proyecto nuevo. La migración crea
 1. Cree el usuario en Supabase > Authentication > Users. Mantenga desactivado el registro público.
 2. Autorícelo con SQL: `insert into public.admins (email, rol) values ('correo@empresa.com', 'validador');`
 
-Roles: `validador` aprueba facturas y entrega premios. `admin` además configura la campaña.
+Roles: `validador` verifica la factura original y entrega o anula premios. `admin` además configura la campaña.
 
 ## Lanzar una campaña
 

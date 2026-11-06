@@ -207,6 +207,14 @@ function Panel({ rol, correo }) {
     await cargar();
   }
 
+  async function anular(id) {
+    const motivo = prompt('Motivo de la anulación:', '');
+    if (motivo === null) return;
+    const { error } = await supabase.rpc('anular_premio', { p_ganador: id, p_motivo: motivo });
+    if (error) alert(error.message);
+    await cargar();
+  }
+
   async function guardarConfig(e) {
     e.preventDefault();
     const { error } = await supabase.from('configuracion_campana').update({ value: config, updated_at: new Date().toISOString() }).eq('key', 'principal');
@@ -305,14 +313,13 @@ function Panel({ rol, correo }) {
   return (
     <>
       <div className="adminHeader">
-        <div><h2>{esAdmin ? 'Panel administrativo' : 'Validación en caja'}</h2><p>{correo}</p></div>
+        <div><h2>{esAdmin ? 'Panel administrativo' : 'Entrega de premios'}</h2><p>{correo}</p></div>
         <button className="logout" onClick={() => supabase.auth.signOut()}>Salir</button>
       </div>
 
-      <div className="card adminSubCard">
+      {pendientes.length > 0 && <div className="card adminSubCard">
         <h2>Facturas por validar ({pendientes.length})</h2>
         <p className="muted">Compare la factura física con estos datos. Corrija el valor si no coincide antes de aprobar.</p>
-        {pendientes.length === 0 && <p>No hay facturas pendientes.</p>}
         {pendientes.map((p) => (
           <div className="filaValidacion" key={p.id}>
             <div>
@@ -325,18 +332,21 @@ function Panel({ rol, correo }) {
             <button className="logout" onClick={() => validar(p, false)}>Rechazar</button>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="card adminSubCard">
         <h2>Premios por entregar ({porEntregar.length})</h2>
+        <p className="muted">Antes de entregar, compare la factura original con estos datos. Si no coincide, anule el premio.</p>
         {porEntregar.length === 0 && <p>No hay premios pendientes de entrega.</p>}
         {porEntregar.map((g) => (
           <div className="filaValidacion" key={g.id}>
             <div>
               <strong>{g.premio}</strong>
               <small>{g.nombre} · {g.factura} · {g.sede} · {fecha(g.fecha)}</small>
+              <small>Valor registrado: {money(participantes.find((p) => p.id === g.participante_id)?.valor)}</small>
             </div>
-            <button className="primary" onClick={() => entregar(g.id)}>Marcar entregado</button>
+            <button className="primary" onClick={() => entregar(g.id)}>Entregar</button>
+            <button className="logout" onClick={() => anular(g.id)}>Anular</button>
           </div>
         ))}
       </div>
@@ -344,8 +354,8 @@ function Panel({ rol, correo }) {
       {esAdmin && (
         <>
           <div className="adminDashboard">
-            <div><span>Ventas validadas</span><strong>{money(metricas.ventas)}</strong></div>
-            <div><span>Facturas aprobadas</span><strong>{aprobadas.length}</strong></div>
+            <div><span>Ventas registradas</span><strong>{money(metricas.ventas)}</strong></div>
+            <div><span>Facturas registradas</span><strong>{aprobadas.length}</strong></div>
             <div><span>Giros realizados</span><strong>{ganadores.length}</strong></div>
             <div><span>Premios ganados</span><strong>{metricas.ganados}</strong></div>
             <div><span>Premios entregados</span><strong>{metricas.entregados}</strong></div>
@@ -355,7 +365,7 @@ function Panel({ rol, correo }) {
           <div className="card adminSubCard">
             <h2>Ventas por sede</h2>
             <div className="salesGrid">
-              {ventasPorSede.length === 0 && <p className="muted">Aún no hay ventas validadas.</p>}
+              {ventasPorSede.length === 0 && <p className="muted">Aún no hay ventas registradas.</p>}
               {ventasPorSede.map((v) => <div key={v.sede}><b>{v.prefijo}</b><strong>{money(v.ventas)}</strong><span>{v.facturas} factura(s) · {v.puntos} pts</span></div>)}
             </div>
           </div>
@@ -385,6 +395,7 @@ function Panel({ rol, correo }) {
               <p className="muted">Antes de abrir la campaña actualice la última factura emitida por sede. La primera válida es el número siguiente.</p>
               <form className="grid" onSubmit={guardarConfig}>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.activa)} onChange={(e) => setConfig({ ...config, activa: e.target.checked })} /> Campaña abierta</label>
+                <label className="checkLine"><input type="checkbox" checked={Boolean(config.validarEnCaja)} onChange={(e) => setConfig({ ...config, validarEnCaja: e.target.checked })} /> Validar facturas en caja antes de girar</label>
                 <label className="checkLine"><input type="checkbox" checked={config.unPremioPorFactura !== false} onChange={(e) => setConfig({ ...config, unPremioPorFactura: e.target.checked })} /> Un solo premio por factura</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
                 <label>Cierre<input type="datetime-local" value={aFechaLocal(config.fechaFin)} onChange={(e) => setConfig({ ...config, fechaFin: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>

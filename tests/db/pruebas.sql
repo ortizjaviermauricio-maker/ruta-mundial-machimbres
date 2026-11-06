@@ -23,7 +23,7 @@ insert into auth.users (id, email, email_confirmed_at) values
   ('00000000-0000-0000-0000-000000000004', 'sinconfirmar@machimbres.test', null);
 insert into public.admins (email, rol) values ('caja@machimbres.test', 'validador'), ('sinconfirmar@machimbres.test', 'admin');
 
-update public.configuracion_campana set value = value || '{"activa":true,"ultimaFacturaFE":100,"valorPorOportunidad":500000,"puntosPorOportunidad":100,"maxOportunidades":10}'::jsonb;
+update public.configuracion_campana set value = value || '{"activa":true,"validarEnCaja":true,"ultimaFacturaFE":100,"valorPorOportunidad":500000,"puntosPorOportunidad":100,"maxOportunidades":10}'::jsonb;
 insert into public.patrocinadores (nombre) values ('Ecofort');
 insert into public.premios (premio, cantidad, peso, entrega_premio, visible_cliente, patrocinador_id) values
   ('Sigue intentando', 0, 50, false, false, null),
@@ -187,6 +187,38 @@ do $$ begin
   if (select count(*) from public.participantes) + (select count(*) from public.ganadores) <> 0 then raise exception 'reinicio'; end if;
 end $$;
 reset role;
+
+-- ===== Sin caja: registra y gira de inmediato; la factura falsa se anula al reclamar =====
+update public.configuracion_campana set value = value || '{"validarEnCaja":false,"unPremioPorFactura":true}'::jsonb;
+delete from public.premios where true;
+insert into public.premios (premio, cantidad, peso, entrega_premio) values ('Taladro', 1, 100, true);
+set role anon;
+do $$
+declare d jsonb := '{"nombre":"Eva Paz","celular":"3005550000","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE800","valorCompra":600000}';
+  r jsonb; g jsonb;
+begin
+  r := public.registrar_factura(d);
+  if r->>'estado' <> 'aprobada' then raise exception 'debía quedar aprobada: %', r; end if;
+  g := public.girar(r->>'token');
+  if g->>'premio' <> 'Taladro' then raise exception 'giro: %', g; end if;
+end $$;
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Otro","celular":"3005550001","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE-800","valorCompra":600000}')$$, 'ya fue registrada');
+select pg_temp.falla($$select public.anular_premio(gen_random_uuid(), 'x')$$, 'permission denied');
+reset role;
+do $$ begin
+  if (select cantidad from public.premios where premio = 'Taladro') <> 0 then raise exception 'stock'; end if;
+  if (public.campana_publica()->'ranking')::text !~ 'Eva' then raise exception 'ranking sin Eva'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', false);
+set role authenticated;
+select pg_temp.falla($$select public.anular_premio((select id from public.ganadores where factura = 'FE800'), ' ')$$, 'motivo');
+select public.anular_premio((select id from public.ganadores where factura = 'FE800'), 'La factura no existe');
+reset role;
+do $$ begin
+  if (select cantidad from public.premios where premio = 'Taladro') <> 1 then raise exception 'stock no devuelto'; end if;
+  if (select estado from public.ganadores where factura = 'FE800') <> 'anulado' then raise exception 'estado'; end if;
+  if (public.campana_publica()->'ranking')::text ~ 'Eva' then raise exception 'anulada sigue en ranking'; end if;
+end $$;
 
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;
