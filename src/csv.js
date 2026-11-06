@@ -37,9 +37,9 @@ export function parsearLinea(linea, separador) {
   return valores;
 }
 
-// Acepta 0.5, 0,5, 1.000 (miles), 1.000,50 y 1,000.50.
+// Acepta 0.5, 0,5, 60%, 1.000 (miles), 1.000,50 y 1,000.50.
 export function normalizarNumero(valor, defecto = 0) {
-  let limpio = String(valor ?? '').trim();
+  let limpio = String(valor ?? '').replace('%', '').trim();
   if (!limpio) return defecto;
   const ultimoPunto = limpio.lastIndexOf('.');
   const ultimaComa = limpio.lastIndexOf(',');
@@ -113,4 +113,33 @@ export function parsearPremiosCSV(contenido, patrocinadores = []) {
   });
 
   return { premios, advertencias };
+}
+
+// Porcentaje real de cada premio: su peso entre la suma de los que pueden salir.
+// Es el caso de una factura con todas las marcas; sin una marca, sus premios no participan.
+export function porcentajesPremios(premios) {
+  const participa = (p) => p.activo !== false && Number(p.peso) > 0 && (!p.entrega_premio || Number(p.cantidad) > 0);
+  const total = premios.filter(participa).reduce((suma, p) => suma + Number(p.peso), 0);
+  return Object.fromEntries(premios.map((p) => [p.id, participa(p) ? (Number(p.peso) / total) * 100 : 0]));
+}
+
+function celdaCSV(valor) {
+  const texto = String(valor ?? '');
+  return /[;"\n]/.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
+}
+
+export const ENCABEZADOS_PREMIOS = ['nombre', 'categoria', 'stock', 'probabilidad', 'visible', 'ilimitado', 'patrocinador'];
+
+// CSV con las mismas columnas que recibe parsearPremiosCSV, para editarlo en Excel y volverlo a subir.
+export function premiosACSV(premios, patrocinadores = []) {
+  const filas = premios.map((p) => [
+    p.premio,
+    p.categoria,
+    p.cantidad,
+    p.peso,
+    p.visible_cliente ? 'TRUE' : 'FALSE',
+    p.entrega_premio ? 'FALSE' : 'TRUE',
+    patrocinadores.find((s) => Number(s.id) === Number(p.patrocinador_id))?.nombre || 'General',
+  ]);
+  return [ENCABEZADOS_PREMIOS, ...filas].map((fila) => fila.map(celdaCSV).join(';')).join('\r\n');
 }

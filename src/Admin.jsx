@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
 import { money, puntos, puntosPorCompra } from './campana';
-import { decodificarArchivo, parsearPremiosCSV } from './csv';
+import { decodificarArchivo, parsearPremiosCSV, porcentajesPremios, premiosACSV } from './csv';
 
 const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids';
 const PATROCINADOR_VACIO = { nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 };
@@ -157,6 +157,7 @@ function Panel({ rol, correo }) {
     return () => window.clearInterval(intervalo);
   }, [cargar]);
 
+  const porcentajes = useMemo(() => porcentajesPremios(premios), [premios]);
   const pendientes = useMemo(() => participantes.filter((p) => p.estado === 'pendiente').reverse(), [participantes]);
   const aprobadas = useMemo(() => participantes.filter((p) => p.estado === 'aprobada'), [participantes]);
   const porEntregar = useMemo(() => ganadores.filter((g) => g.estado === 'pendiente'), [ganadores]);
@@ -248,6 +249,14 @@ function Panel({ rol, correo }) {
     } catch (error) {
       alert(error.message);
     }
+  }
+
+  function descargarPremios() {
+    const filas = premios.length ? premios : [
+      { premio: 'Sigue intentando', categoria: 'Sin premio', cantidad: 0, peso: 60, visible_cliente: false, entrega_premio: false },
+      { premio: 'Premio de ejemplo', categoria: 'Premio inmediato', cantidad: 10, peso: 40, visible_cliente: true, entrega_premio: true },
+    ];
+    descargar('premios_campana.csv', `\ufeff${premiosACSV(filas, patrocinadores)}`, 'text/csv;charset=utf-8');
   }
 
   async function guardarPatrocinador(e) {
@@ -384,7 +393,6 @@ function Panel({ rol, correo }) {
             <button onClick={() => descargarExcel('ventas_por_patrocinador', ventasPorPatrocinador)}>Patrocinadores Excel</button>
             <button onClick={() => descargarExcel('auditoria', auditoria)}>Auditoría Excel</button>
             <button onClick={generarBackup}>Backup JSON</button>
-            <label className="uploadBtn">Subir CSV premios<input type="file" accept=".csv" onChange={subirCSV} /></label>
             <button className="danger" onClick={reiniciar}>Reiniciar campaña</button>
           </div>
 
@@ -419,10 +427,14 @@ function Panel({ rol, correo }) {
 
           <div className="card adminSubCard">
             <h2>Premios y probabilidades</h2>
-            <p className="muted">Los cambios se guardan al salir de cada campo. El cliente no ve las probabilidades.</p>
+            <p className="muted">Los cambios se guardan al salir de cada campo. El cliente no ve las probabilidades. Si la columna Probabilidad suma 100, cada valor es su porcentaje; si no, el % real se recalcula. Un premio agotado sale del cálculo.</p>
+            <div className="adminGrid">
+              <button onClick={descargarPremios}>{premios.length ? 'Descargar premios CSV' : 'Descargar plantilla CSV'}</button>
+              <label className="uploadBtn">Subir CSV premios<input type="file" accept=".csv" onChange={subirCSV} /></label>
+            </div>
             <div className="tableWrap">
               <table>
-                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Peso</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th></tr></thead>
+                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad</th><th>% real</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th></tr></thead>
                 <tbody>
                   {premios.map((p) => (
                     <tr key={`${p.id}-${p.cantidad}-${p.peso}`}>
@@ -430,6 +442,7 @@ function Panel({ rol, correo }) {
                       <td><input defaultValue={p.categoria} onBlur={(e) => e.target.value !== p.categoria && actualizarPremio(p.id, 'categoria', e.target.value)} /></td>
                       <td><input type="number" min="0" defaultValue={p.cantidad} onBlur={(e) => Number(e.target.value) !== p.cantidad && actualizarPremio(p.id, 'cantidad', Number(e.target.value))} /></td>
                       <td><input type="number" min="0" step="0.1" defaultValue={p.peso} onBlur={(e) => Number(e.target.value) !== Number(p.peso) && actualizarPremio(p.id, 'peso', Number(e.target.value))} /></td>
+                      <td><strong>{porcentajes[p.id].toLocaleString('es-CO', { maximumFractionDigits: 1 })}%</strong></td>
                       <td><input type="checkbox" checked={p.visible_cliente} onChange={(e) => actualizarPremio(p.id, 'visible_cliente', e.target.checked)} /></td>
                       <td><input type="checkbox" checked={!p.entrega_premio} onChange={(e) => actualizarPremio(p.id, 'entrega_premio', !e.target.checked)} /></td>
                       <td>
