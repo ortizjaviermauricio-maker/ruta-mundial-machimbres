@@ -7,6 +7,8 @@ export const CAMPANA = {
   invitacion: 'Compra, registra tu factura y gira la ruleta.',
   compromiso: 'Invertimos en tecnología y capacitación para entregarte el mejor producto transformado y darle mayor valor a tus proyectos.',
   pilares: ['Tecnología', 'Capacitación', 'Producto transformado'],
+  // Marcas de lámina del catálogo de ventas. Se muestran como texto: no implican patrocinio.
+  marcas: ['Tablemac', 'Primadera', 'Ecofort', 'Moduofi', 'Masisa', 'Cimca', 'Pelikano', 'Rehau'],
   // Copie aquí la ruta del PDF aprobado por el asesor legal, por ejemplo '/Reglamento_39_Anos.pdf'.
   reglamentoPdf: '',
 };
