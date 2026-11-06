@@ -392,16 +392,25 @@ function Panel({ rol, correo }) {
           {config && (
             <div className="card adminSubCard">
               <h2>Configuración</h2>
-              <p className="muted">Antes de abrir la campaña actualice la última factura emitida por sede. La primera válida es el número siguiente.</p>
+              <p className="muted">Antes de abrir, actualice la última factura emitida por cada prefijo. Las anteriores no podrán jugar.</p>
               <form className="grid" onSubmit={guardarConfig}>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.activa)} onChange={(e) => setConfig({ ...config, activa: e.target.checked })} /> Campaña abierta</label>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.validarEnCaja)} onChange={(e) => setConfig({ ...config, validarEnCaja: e.target.checked })} /> Validar facturas en caja antes de girar</label>
                 <label className="checkLine"><input type="checkbox" checked={config.unPremioPorFactura !== false} onChange={(e) => setConfig({ ...config, unPremioPorFactura: e.target.checked })} /> Un solo premio por factura</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
                 <label>Cierre<input type="datetime-local" value={aFechaLocal(config.fechaFin)} onChange={(e) => setConfig({ ...config, fechaFin: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
-                {[['compraMinima', 'Compra mínima'], ['valorPorOportunidad', 'Valor por oportunidad'], ['puntosPorOportunidad', 'Puntos por oportunidad'], ['maxOportunidades', 'Máximo de oportunidades'], ['ultimaFacturaFE', 'Última factura FE'], ['ultimaFacturaFD', 'Última factura FD'], ['ultimaFacturaSTFD', 'Última factura STFD']].map(([campo, etiqueta]) => (
+                {[['compraMinima', 'Compra mínima'], ['valorPorOportunidad', 'Valor por oportunidad'], ['puntosPorOportunidad', 'Puntos por oportunidad'], ['maxOportunidades', 'Máximo de oportunidades']].map(([campo, etiqueta]) => (
                   <label key={campo}>{etiqueta}<input type="number" min="0" value={config[campo] ?? 0} onChange={(e) => setConfig({ ...config, [campo]: Number(e.target.value) })} /></label>
                 ))}
+                {(config.sedes || []).map((sede) => {
+                  const campo = `ultimaFactura${sede.prefijo}`;
+                  return (
+                    <label key={sede.prefijo}>Última factura {sede.prefijo} antes de abrir
+                      <input type="number" min="0" value={config[campo] ?? 0} onChange={(e) => setConfig({ ...config, [campo]: Number(e.target.value) })} />
+                      <small className="muted">Primera válida: {sede.prefijo}{Number(config[campo] || 0) + 1}</small>
+                    </label>
+                  );
+                })}
                 <label>Versión del reglamento<input value={config.reglamento || ''} onChange={(e) => setConfig({ ...config, reglamento: e.target.value })} /></label>
                 <label>Versión de la autorización<input value={config.autorizacion || ''} onChange={(e) => setConfig({ ...config, autorizacion: e.target.value })} /></label>
                 <button className="primary" type="submit">Guardar configuración</button>
