@@ -8,7 +8,7 @@ const Admin = lazy(() => import('./Admin.jsx'));
 
 const CLAVE_TOKEN = 'campana_factura_token';
 const NAVEGACION = ['Inicio', 'Participar', 'Ruleta', 'Ranking', 'Más'];
-const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, patrocinadorIds: [] };
+const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', patrocinadorIds: [] };
 const CONFIG_VACIA = { activa: false, compraMinima: 0, valorPorOportunidad: 1, puntosPorOportunidad: 0, maxOportunidades: 0, sedes: SEDES_RESPALDO };
 const DURACION_GIRO = 3300;
 
@@ -112,6 +112,7 @@ export default function App() {
       </header>
 
       {errorCarga && <div className="aviso error" role="alert">{errorCarga}</div>}
+      {config.modoPruebas && !personal && <div className="aviso prueba">MODO PRUEBAS: nada de lo registrado aquí es real.</div>}
       {!errorCarga && !config.activa && !personal && <div className="aviso">La campaña todavía no está abierta. Muy pronto podrás participar.</div>}
 
       <main className="vista">
@@ -183,10 +184,29 @@ function Aliados({ patrocinadores }) {
 function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
+  const [yaAutorizo, setYaAutorizo] = useState(false);
   const sede = form.sede || sedes[0].nombre;
   const prefijo = sedes.find((s) => s.nombre === sede)?.prefijo || 'FE';
   const valor = Number(form.valorCompra || 0);
   const giros = girosPorCompra(valor, config);
+
+  // Quien ya autorizó con este celular no vuelve a recibir la solicitud de datos.
+  useEffect(() => {
+    const celular = form.celular.replace(/\D/g, '');
+    if (celular.length < 7) {
+      setYaAutorizo(false);
+      return undefined;
+    }
+    let vigente = true;
+    const espera = window.setTimeout(async () => {
+      const { data } = await supabase.rpc('autorizacion_vigente', { p_celular: celular });
+      if (vigente) setYaAutorizo(Boolean(data));
+    }, 400);
+    return () => {
+      vigente = false;
+      window.clearTimeout(espera);
+    };
+  }, [form.celular]);
 
   function alternarMarca(id) {
     setForm((prev) => ({
@@ -202,6 +222,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
     const { data, error } = await supabase.rpc('registrar_factura', {
       p_datos: {
         ...resto,
+        autorizacion: !yaAutorizo && form.autorizacion,
         ...separarNombre(nombreCompleto),
         sede,
         userAgent: navigator.userAgent,
@@ -254,12 +275,21 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
             </div>
           )}
           <p className="nota" style={{ fontSize: 14 }}>Registra los datos tal como aparecen en tu factura. La presentarás para reclamar tu premio.</p>
+          {yaAutorizo
+            ? <p className="nota" style={{ fontSize: 14 }}>Ya tenemos tu autorización de datos personales.</p>
+            : (
+              <label className="casilla">
+                <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
+                <span>Autorizo el tratamiento de mis datos personales.</span>
+              </label>
+            )}
           <label className="casilla">
-            <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
-            <span>Acepto el tratamiento de datos personales y el reglamento de la campaña.{' '}
+            <input id="reglamento" type="checkbox" required checked={form.aceptaReglamento} onChange={(e) => setForm({ ...form, aceptaReglamento: e.target.checked })} />
+            <span>Acepto el reglamento de la campaña.{' '}
               {CAMPANA.reglamentoPdf && <a href={CAMPANA.reglamentoPdf} target="_blank" rel="noopener noreferrer">Ver reglamento</a>}
             </span>
           </label>
+          {config.modoPruebas && <label>Código de prueba<input id="codigo-prueba" required autoComplete="off" value={form.codigoPrueba} onChange={(e) => setForm({ ...form, codigoPrueba: e.target.value.trim() })} /></label>}
           <button className="boton empuje" type="submit" disabled={enviando || !config.activa || valor < Number(config.compraMinima)}>{enviando ? 'REGISTRANDO…' : 'CONTINUAR'}</button>
         </form>
       </div>

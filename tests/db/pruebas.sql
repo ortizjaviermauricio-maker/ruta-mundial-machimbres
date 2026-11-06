@@ -65,7 +65,7 @@ select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE100","valorCompra":600000}')$$, 'anterior al inicio');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FD500","valorCompra":600000}')$$, 'prefijo');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE500","valorCompra":100}')$$, 'mínimo');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","factura":"FE500","valorCompra":600000}')$$, 'tratamiento de datos');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","factura":"FE500","valorCompra":600000}')$$, 'reglamento');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"abc","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE500","valorCompra":600000}')$$, 'celular');
 
 -- ===== Sin validar no gira, ni con token falso =====
@@ -243,6 +243,44 @@ begin
   if (select array_agg(e->>'nombre' order by o) from jsonb_array_elements(r) with ordinality t(e, o) where e->>'nombre' in ('Rita V.', 'Ida M.', 'Ada M.'))
      <> array['Rita V.', 'Ida M.', 'Ada M.'] then raise exception 'desempate por compra: %', r; end if;
 end $$;
+
+-- ===== Modo pruebas y autorización solo para nuevos =====
+update public.configuracion_campana set value = value || '{"modoPruebas":true,"codigoPrueba":"M39-TEST","validarEnCaja":false}'::jsonb;
+update public.premios set cantidad = 1 where premio = 'Taladro';
+update public.premios set peso = 0 where premio <> 'Taladro';
+set role anon;
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"factura":"FE911","valorCompra":1000000}')$$, 'Código de prueba');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}')$$, 'tratamiento de datos');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":false,"autorizacion":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}')$$, 'reglamento');
+do $$
+declare r jsonb;
+begin
+  if public.autorizacion_vigente('300 555 0201') then raise exception 'nueva no debía tener autorización'; end if;
+  r := public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}');
+  perform public.girar(r->>'token');
+  if not public.autorizacion_vigente('300 555 0201') then raise exception 'autorización no reconocida'; end if;
+  r := public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"factura":"FE912","valorCompra":1000000,"codigoPrueba":"M39-TEST"}');
+  if r->>'estado' <> 'aprobada' then raise exception 'recurrente: %', r; end if;
+end $$;
+select pg_temp.falla($$select public.borrar_datos_prueba()$$, 'permission denied');
+reset role;
+do $$ begin
+  if (select count(*) from public.autorizaciones_datos where celular = '3005550201' and acepto_tratamiento_datos) <> 1 then raise exception 'la segunda factura no debía crear autorización'; end if;
+  if (select cantidad from public.premios where premio = 'Taladro') <> 0 then raise exception 'giro no descontó'; end if;
+  if (public.campana_publica()->'config')::text ~ 'M39-TEST' then raise exception 'código expuesto'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+insert into public.admins (email, rol) values ('ortiz.javiermauricio@hotmail.com', 'admin') on conflict do nothing;
+set role authenticated;
+select public.borrar_datos_prueba();
+reset role;
+do $$ begin
+  if exists (select 1 from public.participantes where prueba) then raise exception 'quedaron pruebas'; end if;
+  if exists (select 1 from public.autorizaciones_datos where celular = '3005550201') then raise exception 'quedó autorización de prueba'; end if;
+  if (select cantidad from public.premios where premio = 'Taladro') <> 1 then raise exception 'inventario no devuelto'; end if;
+  if (select count(*) from public.participantes where not prueba) = 0 then raise exception 'borró datos reales'; end if;
+end $$;
+update public.configuracion_campana set value = value || '{"modoPruebas":false}'::jsonb;
 
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;

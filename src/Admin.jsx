@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 import { money, puntos, puntosPorCompra } from './campana';
 import { decodificarArchivo, parsearPremiosCSV, porcentajesPremios, premiosACSV } from './csv';
 
-const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids';
+const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids,prueba';
 const PATROCINADOR_VACIO = { nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 };
 
 function escapar(texto) {
@@ -303,6 +303,13 @@ function Panel({ rol, correo }) {
     await cargar();
   }
 
+  async function borrarPruebas() {
+    if (!confirm(`Se borrarán ${participantes.filter((p) => p.prueba).length} facturas de prueba, con sus giros y autorizaciones, y sus premios volverán al inventario. Los datos reales no se tocan. ¿Continuar?`)) return;
+    const { data, error } = await supabase.rpc('borrar_datos_prueba');
+    alert(error ? error.message : `Se borraron ${data.facturas} facturas de prueba.`);
+    await cargar();
+  }
+
   async function cambiarClave(e) {
     e.preventDefault();
     if (claves.nueva.length < 10) {
@@ -393,6 +400,7 @@ function Panel({ rol, correo }) {
             <button onClick={() => descargarExcel('ventas_por_patrocinador', ventasPorPatrocinador)}>Patrocinadores Excel</button>
             <button onClick={() => descargarExcel('auditoria', auditoria)}>Auditoría Excel</button>
             <button onClick={generarBackup}>Backup JSON</button>
+            <button onClick={borrarPruebas}>Borrar datos de prueba</button>
             <button className="danger" onClick={reiniciar}>Reiniciar campaña</button>
           </div>
 
@@ -402,6 +410,8 @@ function Panel({ rol, correo }) {
               <p className="muted">Antes de abrir, actualice la última factura emitida por cada prefijo. Las anteriores no podrán jugar.</p>
               <form className="grid" onSubmit={guardarConfig}>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.activa)} onChange={(e) => setConfig({ ...config, activa: e.target.checked })} /> Campaña abierta</label>
+                <label className="checkLine"><input type="checkbox" checked={Boolean(config.modoPruebas)} onChange={(e) => setConfig({ ...config, modoPruebas: e.target.checked })} /> Modo pruebas: solo registra quien tenga el código</label>
+                <label>Código de prueba<input value={config.codigoPrueba || ''} onChange={(e) => setConfig({ ...config, codigoPrueba: e.target.value.trim() })} /></label>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.validarEnCaja)} onChange={(e) => setConfig({ ...config, validarEnCaja: e.target.checked })} /> Validar facturas en caja antes de girar</label>
                 <label className="checkLine"><input type="checkbox" checked={config.unPremioPorFactura !== false} onChange={(e) => setConfig({ ...config, unPremioPorFactura: e.target.checked })} /> Un solo premio por factura</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>

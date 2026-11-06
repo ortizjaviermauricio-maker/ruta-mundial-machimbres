@@ -52,6 +52,7 @@ a { color: var(--verde); }
 .linkButton { min-height: 44px; border: 0; background: none; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 
 .aviso { padding: 12px 20px; font-weight: 600; background: var(--arena); }
+.aviso.prueba { background: var(--oro); text-align: center; }
 .aviso.error { background: #fdecec; color: var(--error); }
 
 /* Ruleta: disco que gira y marco fijo con luces, puntero y sello de los 39 años. */
