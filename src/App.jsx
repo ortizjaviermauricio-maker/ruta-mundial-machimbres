@@ -186,8 +186,10 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   const [enviando, setEnviando] = useState(false);
   const [yaAutorizo, setYaAutorizo] = useState(false);
   const [textoAutorizacion, setTextoAutorizacion] = useState('');
-  const sede = form.sede || sedes[0].nombre;
-  const prefijo = sedes.find((s) => s.nombre === sede)?.prefijo || 'FE';
+  // La sede se deduce del prefijo de la factura, igual que en el servidor.
+  const facturaLimpia = form.factura.replace(/[\s-]/g, '');
+  const sedeDetectada = [...sedes].sort((a, b) => b.prefijo.length - a.prefijo.length)
+    .find((s) => new RegExp(`^${s.prefijo}\\d+$`).test(facturaLimpia));
   const valor = Number(form.valorCompra || 0);
   const giros = girosPorCompra(valor, config);
 
@@ -229,7 +231,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
         ...resto,
         autorizacion: !yaAutorizo && form.autorizacion,
         ...separarNombre(nombreCompleto),
-        sede,
+        sede: sedeDetectada?.nombre || '',
         userAgent: navigator.userAgent,
         idioma: navigator.language,
         plataforma: navigator.platform,
@@ -251,15 +253,15 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
         <form className="formulario" onSubmit={enviar}>
           <label>Nombre completo<input id="nombre" required autoComplete="name" value={form.nombreCompleto} onChange={(e) => setForm({ ...form, nombreCompleto: e.target.value })} /></label>
           <label>Celular<input id="celular" required inputMode="tel" autoComplete="tel" value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} /></label>
-          <label>Sede
-            <select id="sede" value={sede} onChange={(e) => setForm({ ...form, sede: e.target.value })}>
-              {sedes.map((s) => <option key={s.prefijo} value={s.nombre}>{s.nombre}</option>)}
-            </select>
-          </label>
           <div className="dos">
-            <label>Factura<input id="factura" required placeholder={`${prefijo}32150`} autoCapitalize="characters" value={form.factura} onChange={(e) => setForm({ ...form, factura: e.target.value.toUpperCase() })} /></label>
+            <label>Factura<input id="factura" required placeholder={`${sedes.map((x) => x.prefijo).join(', ')} + número`} autoCapitalize="characters" value={form.factura} onChange={(e) => setForm({ ...form, factura: e.target.value.toUpperCase() })} /></label>
             <label>Valor exacto<input id="valor" required type="number" inputMode="numeric" min="0" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
           </div>
+          {facturaLimpia && (
+            <p className="nota" aria-live="polite" style={{ fontSize: 14 }}>
+              {sedeDetectada ? `Sede: ${sedeDetectada.nombre}` : `La factura debe empezar con ${sedes.map((x) => x.prefijo).join(', ')}.`}
+            </p>
+          )}
           {patrocinadores.length > 0 && (
             <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
               <legend style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>Marcas aliadas de tu compra</legend>
