@@ -153,6 +153,10 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       <p className="nota">{CAMPANA.invitacion}</p>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
       {Number(config.compraMinima) > 0 && <p className="nota">Compras desde {money(config.compraMinima)} en nuestras sedes</p>}
+      <section className="compromiso">
+        <p>{CAMPANA.compromiso}</p>
+        <ul>{CAMPANA.pilares.map((pilar) => <li key={pilar}>{pilar}</li>)}</ul>
+      </section>
       {patrocinadores.length > 0 && <Aliados patrocinadores={patrocinadores} />}
     </div>
   );
@@ -340,7 +344,7 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
         <strong>{resultado.premio}</strong>
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
-      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura y tu documento.' : 'Gracias por celebrar con nosotros.'}</p>
+      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
       {resultado.restantes > 0
         ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>SEGUIR GIRANDO</button>
         : <button type="button" className="boton oscuro-b empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>}

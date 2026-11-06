@@ -63,6 +63,11 @@ a { color: var(--verde); }
 @keyframes luz { 50% { fill: var(--oro); } }
 .acento { color: var(--oro); }
 
+.compromiso { width: 100%; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, .28); display: flex; flex-direction: column; gap: 12px; }
+.compromiso p { color: var(--claro); font-size: 18px; line-height: 1.35; }
+.compromiso ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.compromiso li { padding: 6px 12px; border: 1px solid var(--oro); border-radius: 6px; color: var(--oro); font: 700 18px/1.2 var(--titulos); }
+
 .formulario { display: flex; flex-direction: column; gap: 13px; flex: 1; }
 .formulario label, .grid label { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 15px; }
 input:not([type='checkbox']):not([type='file']), select { width: 100%; min-height: 48px; padding: 11px 12px; border: 1px solid var(--linea); border-radius: 6px; background: #fff; font-size: 17px; }
