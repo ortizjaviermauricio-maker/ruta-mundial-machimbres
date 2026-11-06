@@ -56,17 +56,17 @@ end $$;
 create temp table t (k text primary key, v text);
 grant all on t to anon, authenticated;
 do $$
-declare base jsonb := '{"nombre":"Ana María","apellido":"Rojas","celular":"300 123 4567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true}';
+declare base jsonb := '{"nombre":"Ana María","apellido":"Rojas","celular":"300 123 4567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678"}';
 begin
   insert into t values ('t1', public.registrar_factura(base || '{"factura":"fe-101","valorCompra":1600000}')->>'token');
   insert into t values ('t2', public.registrar_factura(base || '{"factura":"FE102","valorCompra":99000000,"patrocinadorIds":[1,999]}')->>'token');
 end $$;
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE101","valorCompra":600000}')$$, 'ya fue registrada');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE100","valorCompra":600000}')$$, 'anterior al inicio');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FD500","valorCompra":600000}')$$, 'prefijo');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE500","valorCompra":100}')$$, 'mínimo');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE101","valorCompra":600000}')$$, 'ya fue registrada');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE100","valorCompra":600000}')$$, 'anterior al inicio');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FD500","valorCompra":600000}')$$, 'prefijo');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE500","valorCompra":100}')$$, 'mínimo');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","factura":"FE500","valorCompra":600000}')$$, 'reglamento');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"abc","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE500","valorCompra":600000}')$$, 'celular');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"abc","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE500","valorCompra":600000}')$$, 'celular');
 
 -- ===== Sin validar no gira, ni con token falso =====
 select pg_temp.falla(format('select public.girar(%L)', (select v from t where k = 't1')), 'por validar');
@@ -194,7 +194,7 @@ delete from public.premios where true;
 insert into public.premios (premio, cantidad, peso, entrega_premio) values ('Taladro', 1, 100, true);
 set role anon;
 do $$
-declare d jsonb := '{"nombre":"Eva Paz","celular":"3005550000","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE800","valorCompra":600000}';
+declare d jsonb := '{"nombre":"Eva Paz","celular":"3005550000","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE800","valorCompra":600000}';
   r jsonb; g jsonb;
 begin
   r := public.registrar_factura(d);
@@ -202,7 +202,7 @@ begin
   g := public.girar(r->>'token');
   if g->>'premio' <> 'Taladro' then raise exception 'giro: %', g; end if;
 end $$;
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"Otro","celular":"3005550001","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE-800","valorCompra":600000}')$$, 'ya fue registrada');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Otro","celular":"3005550001","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE-800","valorCompra":600000}')$$, 'ya fue registrada');
 select pg_temp.falla($$select public.anular_premio(gen_random_uuid(), 'x')$$, 'permission denied');
 reset role;
 do $$ begin
@@ -223,12 +223,12 @@ end $$;
 -- ===== Ranking por compra acumulada =====
 update public.configuracion_campana set value = value || '{"validarEnCaja":false,"valorPorOportunidad":1000000,"puntosPorOportunidad":5000,"maxOportunidades":5,"compraMinima":500000}'::jsonb;
 set role anon;
-select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE901","valorCompra":900000}');
-select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE902","valorCompra":900000}');
-select public.registrar_factura('{"nombre":"Beto","apellido":"Paz","celular":"3005550102","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE903","valorCompra":20000000}');
-select public.registrar_factura('{"nombre":"Cora","apellido":"Luna","celular":"3005550103","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE904","valorCompra":700000}');
-select public.registrar_factura('{"nombre":"Ada","apellido":"Mora","celular":"3005550104","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE905","valorCompra":1100000}');
-select public.registrar_factura('{"nombre":"Ida","apellido":"Mesa","celular":"3005550105","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE906","valorCompra":1500000}');
+select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE901","valorCompra":900000}');
+select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE902","valorCompra":900000}');
+select public.registrar_factura('{"nombre":"Beto","apellido":"Paz","celular":"3005550102","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE903","valorCompra":20000000}');
+select public.registrar_factura('{"nombre":"Cora","apellido":"Luna","celular":"3005550103","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE904","valorCompra":700000}');
+select public.registrar_factura('{"nombre":"Ada","apellido":"Mora","celular":"3005550104","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE905","valorCompra":1100000}');
+select public.registrar_factura('{"nombre":"Ida","apellido":"Mesa","celular":"3005550105","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE906","valorCompra":1500000}');
 reset role;
 do $$
 declare
@@ -249,14 +249,14 @@ update public.configuracion_campana set value = value || '{"modoPruebas":true,"c
 update public.premios set cantidad = 1 where premio = 'Taladro';
 update public.premios set peso = 0 where premio <> 'Taladro';
 set role anon;
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"factura":"FE911","valorCompra":1000000}')$$, 'Código de prueba');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE911","valorCompra":1000000}')$$, 'Código de prueba');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}')$$, 'tratamiento de datos');
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":false,"autorizacion":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}')$$, 'reglamento');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":false,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}')$$, 'reglamento');
 do $$
 declare r jsonb;
 begin
   if public.autorizacion_vigente('300 555 0201') then raise exception 'nueva no debía tener autorización'; end if;
-  r := public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}');
+  r := public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE911","valorCompra":1000000,"codigoPrueba":"M39-TEST"}');
   perform public.girar(r->>'token');
   if not public.autorizacion_vigente('300 555 0201') then raise exception 'autorización no reconocida'; end if;
   r := public.registrar_factura('{"nombre":"Tia","apellido":"Rey","celular":"3005550201","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"factura":"FE912","valorCompra":1000000,"codigoPrueba":"M39-TEST"}');
@@ -282,10 +282,28 @@ do $$ begin
 end $$;
 update public.configuracion_campana set value = value || '{"modoPruebas":false}'::jsonb;
 
+-- ===== Documento y finalidades =====
+update public.configuracion_campana set value = value || '{"validarEnCaja":false}'::jsonb;
+set role anon;
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Lia","apellido":"Paz","celular":"3005550301","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"factura":"FE921","valorCompra":1000000}')$$, 'documento');
+select public.registrar_factura('{"nombre":"Lia","apellido":"Paz","celular":"3005550301","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"cc","numeroDocumento":"1.098.765.432","factura":"FE921","valorCompra":1000000}');
+select public.registrar_factura('{"nombre":"Lia","apellido":"Paz","celular":"3005550301","sede":"Machimbres y Maderas S.A.S.","aceptaReglamento":true,"factura":"FE922","valorCompra":1000000}');
+reset role;
+do $$
+declare a public.autorizaciones_datos;
+begin
+  select * into a from public.autorizaciones_datos where factura = 'FE921';
+  if a.tipo_documento <> 'CC' or a.numero_documento <> '1098765432' then raise exception 'documento: %', a; end if;
+  if not (a.finalidades @> array['campanas', 'marketing', 'whatsapp']) then raise exception 'finalidades: %', a.finalidades; end if;
+  if a.texto_autorizacion !~ 'mercadeo' then raise exception 'texto: %', a.texto_autorizacion; end if;
+  if a.sigpdp_registrada_at is not null then raise exception 'cola'; end if;
+  if (select numero_documento from public.autorizaciones_datos where factura = 'FE922') is not null then raise exception 'la recurrente no guarda documento'; end if;
+end $$;
+
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;
 set role anon;
-select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE700","valorCompra":600000}')$$, 'no está abierta');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE700","valorCompra":600000}')$$, 'no está abierta');
 reset role;
 
 \echo PRUEBAS_SECUENCIALES_OK

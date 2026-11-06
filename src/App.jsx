@@ -8,7 +8,7 @@ const Admin = lazy(() => import('./Admin.jsx'));
 
 const CLAVE_TOKEN = 'campana_factura_token';
 const NAVEGACION = ['Inicio', 'Participar', 'Ruleta', 'Ranking', 'Más'];
-const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', patrocinadorIds: [] };
+const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', tipoDocumento: 'CC', numeroDocumento: '', patrocinadorIds: [] };
 const CONFIG_VACIA = { activa: false, compraMinima: 0, valorPorOportunidad: 1, puntosPorOportunidad: 0, maxOportunidades: 0, sedes: SEDES_RESPALDO };
 const DURACION_GIRO = 3300;
 
@@ -185,10 +185,15 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   const [form, setForm] = useState(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
   const [yaAutorizo, setYaAutorizo] = useState(false);
+  const [textoAutorizacion, setTextoAutorizacion] = useState('');
   const sede = form.sede || sedes[0].nombre;
   const prefijo = sedes.find((s) => s.nombre === sede)?.prefijo || 'FE';
   const valor = Number(form.valorCompra || 0);
   const giros = girosPorCompra(valor, config);
+
+  useEffect(() => {
+    supabase.rpc('texto_autorizacion').then(({ data }) => setTextoAutorizacion(data || ''));
+  }, []);
 
   // Quien ya autorizó con este celular no vuelve a recibir la solicitud de datos.
   useEffect(() => {
@@ -278,10 +283,23 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           {yaAutorizo
             ? <p className="nota" style={{ fontSize: 14 }}>Ya tenemos tu autorización de datos personales.</p>
             : (
-              <label className="casilla">
-                <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
-                <span>Autorizo el tratamiento de mis datos personales.</span>
-              </label>
+              <>
+                <div className="dos">
+                  <label>Tipo de documento
+                    <select id="tipo-documento" value={form.tipoDocumento} onChange={(e) => setForm({ ...form, tipoDocumento: e.target.value })}>
+                      <option value="CC">Cédula</option>
+                      <option value="NIT">NIT</option>
+                      <option value="CE">Cédula de extranjería</option>
+                      <option value="PA">Pasaporte</option>
+                    </select>
+                  </label>
+                  <label>Número de documento<input id="numero-documento" required autoComplete="off" value={form.numeroDocumento} onChange={(e) => setForm({ ...form, numeroDocumento: e.target.value })} /></label>
+                </div>
+                <label className="casilla">
+                  <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
+                  <span>{textoAutorizacion} {config.habeas && `Consultas y reclamos: ${config.habeas}.`}</span>
+                </label>
+              </>
             )}
           <label className="casilla">
             <input id="reglamento" type="checkbox" required checked={form.aceptaReglamento} onChange={(e) => setForm({ ...form, aceptaReglamento: e.target.checked })} />
