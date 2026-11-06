@@ -159,7 +159,7 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       </section>
       <section className="marcas-lamina">
         <h2>Marcas de láminas que manejamos</h2>
-        <ul>{CAMPANA.marcas.map((marca) => <li key={marca}>{marca}</li>)}</ul>
+        <ul>{CAMPANA.marcas.map((m) => <li key={m.nombre}>{m.logo ? <img src={m.logo} alt={m.nombre} /> : m.nombre}</li>)}</ul>
       </section>
       {patrocinadores.length > 0 && <Aliados patrocinadores={patrocinadores} />}
     </div>
