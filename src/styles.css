@@ -88,6 +88,7 @@ input:not([type='checkbox']):not([type='file']), select { width: 100%; min-heigh
 .ficha .giros { font-weight: 600; color: var(--verde); font-size: 18px; }
 .resultado { flex: 1; background-color: var(--naranja); padding: 48px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
 .resultado.sin { background: var(--nogal); color: var(--claro); }
+.resultado.sin .boton.oscuro-b { background: var(--naranja); color: var(--texto); }
 .tarjeta { width: 100%; background: #fff; color: var(--texto); border-radius: 8px; padding: 32px 20px; display: flex; flex-direction: column; gap: 10px; }
 .tarjeta strong { font: 800 48px/1 var(--titulos); color: var(--verde); overflow-wrap: anywhere; }
 

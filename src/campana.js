@@ -4,7 +4,7 @@ export const CAMPANA = {
   desde: 'DESDE 1987',
   titular: 'ESTAMOS DE ANIVERSARIO',
   subtitulo: '39 AÑOS SIENDO PARTE DE TUS PROYECTOS',
-  invitacion: 'Compra, gira la ruleta y gana.',
+  invitacion: 'Compra, registra tu factura y gira la ruleta.',
   compromiso: 'Invertimos en tecnología y capacitación para entregarte el mejor producto transformado y darle mayor valor a tus proyectos.',
   pilares: ['Tecnología', 'Capacitación', 'Producto transformado'],
   // Copie aquí la ruta del PDF aprobado por el asesor legal, por ejemplo '/Reglamento_39_Anos.pdf'.
@@ -19,6 +19,20 @@ export const SEDES_RESPALDO = [
 
 export function money(valor) {
   return Number(valor || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+}
+
+export function puntos(valor) {
+  return Number(valor || 0).toLocaleString('es-CO');
+}
+
+export function girosPorCompra(valor, config) {
+  const porGiro = Math.max(Number(config.valorPorOportunidad || 1), 1);
+  return Math.min(Math.floor(Number(valor || 0) / porGiro), Number(config.maxOportunidades || 0));
+}
+
+// Lo que se promete debe dar al menos un giro: el mínimo real es el mayor entre la compra mínima y el valor de un giro.
+export function compraParaGirar(config) {
+  return Math.max(Number(config.compraMinima || 0), Number(config.valorPorOportunidad || 0));
 }
 
 // El registro pide un solo campo; el servidor guarda nombre y apellido por separado para el ranking.

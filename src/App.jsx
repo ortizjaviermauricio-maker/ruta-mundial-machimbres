@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import './styles.css';
 import { supabase } from './supabase';
 import Rueda from './Rueda.jsx';
-import { CAMPANA, SEDES_RESPALDO, money, separarNombre, siguienteRotacion } from './campana';
+import { CAMPANA, SEDES_RESPALDO, compraParaGirar, girosPorCompra, money, puntos, separarNombre, siguienteRotacion } from './campana';
 
 const Admin = lazy(() => import('./Admin.jsx'));
 
@@ -152,7 +152,7 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
-      {Number(config.compraMinima) > 0 && <p className="nota">Compras desde {money(config.compraMinima)} en nuestras sedes</p>}
+      {compraParaGirar(config) > 1 && <p className="nota">Compras desde {money(compraParaGirar(config))} en nuestras sedes</p>}
       <section className="compromiso">
         <p>{CAMPANA.compromiso}</p>
         <ul>{CAMPANA.pilares.map((pilar) => <li key={pilar}>{pilar}</li>)}</ul>
@@ -182,7 +182,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   const sede = form.sede || sedes[0].nombre;
   const prefijo = sedes.find((s) => s.nombre === sede)?.prefijo || 'FE';
   const valor = Number(form.valorCompra || 0);
-  const giros = Math.min(Math.floor(valor / Math.max(Number(config.valorPorOportunidad || 1), 1)), Number(config.maxOportunidades || 0));
+  const giros = girosPorCompra(valor, config);
 
   function alternarMarca(id) {
     setForm((prev) => ({
@@ -245,7 +245,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           )}
           {valor > 0 && (
             <div className="calculo">
-              <span>{giros > 0 ? 'Con esta compra ganas' : `Cada ${money(config.valorPorOportunidad)} da un giro`}</span>
+              <span>{giros > 0 ? 'Con esta compra tienes' : `Necesitas compras desde ${money(compraParaGirar(config))}`}</span>
               <strong>{giros} {giros === 1 ? 'GIRO' : 'GIROS'}</strong>
             </div>
           )}
@@ -256,7 +256,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
               {CAMPANA.reglamentoPdf && <a href={CAMPANA.reglamentoPdf} target="_blank" rel="noopener noreferrer">Ver reglamento</a>}
             </span>
           </label>
-          <button className="boton empuje" type="submit" disabled={enviando || !config.activa}>{enviando ? 'REGISTRANDO…' : 'CONTINUAR'}</button>
+          <button className="boton empuje" type="submit" disabled={enviando || !config.activa || giros === 0}>{enviando ? 'REGISTRANDO…' : 'CONTINUAR'}</button>
         </form>
       </div>
     </>
@@ -346,8 +346,9 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
       <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
+      {resultado.es_premio && resultado.restantes > 0 && <p>Cada factura gana un solo premio, así que {resultado.restantes === 1 ? 'tu giro restante no dará' : `tus ${resultado.restantes} giros restantes no darán`} otro premio.</p>}
       {resultado.restantes > 0
-        ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>SEGUIR GIRANDO</button>
+        ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>{resultado.es_premio ? 'USAR GIROS RESTANTES' : 'SEGUIR GIRANDO'}</button>
         : <button type="button" className="boton oscuro-b empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>}
     </div>
   );
@@ -392,7 +393,7 @@ function Ranking({ ranking }) {
             <div className="fila" key={`${p.nombre}-${i}`}>
               <b>{i + 1}</b>
               <div>{p.nombre}<small>{p.facturas} {p.facturas === 1 ? 'factura' : 'facturas'}</small></div>
-              <strong>{p.puntos} pts</strong>
+              <strong>{puntos(p.puntos)} pts</strong>
             </div>
           ))}
         </div>
@@ -439,9 +440,9 @@ function ComoFunciona({ config, sedes }) {
       <div className="barra"><h1>CÓMO FUNCIONA</h1></div>
       <div className="cuerpo legal">
         <ul>
-          <li>Compra mínima para participar: {money(config.compraMinima)}.</li>
+          <li>Compra mínima para participar: {money(compraParaGirar(config))}.</li>
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
-          <li>Cada giro suma {config.puntosPorOportunidad} puntos para el ranking.</li>
+          <li>Cada giro suma {puntos(config.puntosPorOportunidad)} puntos para el ranking.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
           <li>Cada factura se registra una sola vez y gira de inmediato.</li>
           <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>
