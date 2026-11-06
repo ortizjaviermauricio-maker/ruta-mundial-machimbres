@@ -2,8 +2,9 @@
 export const CAMPANA = {
   nombre: '39 años Machimbres y Maderas',
   desde: 'DESDE 1987',
-  titular: '39 ANILLOS DE HISTORIA',
-  invitacion: 'Celebra con nosotros. Compra, gira y gana.',
+  titular: 'ESTAMOS DE ANIVERSARIO',
+  subtitulo: '39 AÑOS CONSTRUYENDO TUS IDEAS',
+  invitacion: 'Compra, gira la ruleta y gana.',
   // Copie aquí la ruta del PDF aprobado por el asesor legal, por ejemplo '/Reglamento_39_Anos.pdf'.
   reglamentoPdf: '',
 };

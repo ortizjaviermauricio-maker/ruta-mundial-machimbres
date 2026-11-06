@@ -2,12 +2,13 @@
 :root {
   --naranja: #fa7b14;
   --verde: #0e6b1f;
-  --nogal: #2b1a10;
-  --texto: #24170f;
-  --suave: #5c4b3f;
-  --claro: #fff8ef;
-  --claro-suave: #f1dec8;
-  --arena: #f7efe6;
+  --nogal: #123f22;
+  --oro: #ffc23d;
+  --texto: #17231b;
+  --suave: #4c5a50;
+  --claro: #ffffff;
+  --claro-suave: #d9eadc;
+  --arena: #fff1e3;
   --linea: #8a7768;
   --linea-suave: #e4dbd2;
   --error: #9b1c1c;
@@ -53,15 +54,14 @@ a { color: var(--verde); }
 .aviso { padding: 12px 20px; font-weight: 600; background: var(--arena); }
 .aviso.error { background: #fdecec; color: var(--error); }
 
-/* Tronco: 39 anillos dibujados con gradiente; el 39 va al centro. */
-.tronco { width: 270px; height: 270px; border-radius: 50%; border: 9px solid var(--naranja); display: flex; align-items: center; justify-content: center; background: repeating-radial-gradient(circle at 48% 52%, #d9a869 0 5px, #a96d39 5px 7px, #e3b77f 7px 12px, #8a5529 12px 13px); }
-.sello { width: 118px; height: 118px; border-radius: 50%; background: var(--claro); color: var(--nogal); display: flex; align-items: center; justify-content: center; font: 800 92px/1 var(--titulos); }
-
-.ruleta { position: relative; width: min(330px, 100%); aspect-ratio: 1; margin-top: 18px; }
-.ruleta::before { content: ''; position: absolute; z-index: 2; top: -18px; left: 50%; margin-left: -15px; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid var(--naranja); }
-.disco { width: 100%; height: 100%; border-radius: 50%; border: 10px solid var(--naranja); display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#d9a869 0 30deg, #a96d39 30deg 60deg); transition: transform 3.2s cubic-bezier(.12, .7, .15, 1); }
-.centro { width: 42%; height: 42%; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: repeating-radial-gradient(circle, #e3b77f 0 5px, #8a5529 5px 6px); }
-.centro span { width: 60%; height: 60%; border-radius: 50%; background: var(--claro); color: var(--nogal); display: flex; align-items: center; justify-content: center; font: 800 58px/1 var(--titulos); }
+/* Ruleta: disco que gira y marco fijo con luces, puntero y sello de los 39 años. */
+.rueda { position: relative; width: min(340px, 100%); aspect-ratio: 1; }
+.rueda svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rueda-disco { transition: transform 3.2s cubic-bezier(.12, .7, .15, 1); }
+.luz { fill: #fff; animation: luz 1.2s steps(2) infinite; }
+.luz.alterna { animation-delay: .6s; }
+@keyframes luz { 50% { fill: var(--oro); } }
+.acento { color: var(--oro); }
 
 .formulario { display: flex; flex-direction: column; gap: 13px; flex: 1; }
 .formulario label, .grid label { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 15px; }
@@ -81,7 +81,7 @@ input:not([type='checkbox']):not([type='file']), select { width: 100%; min-heigh
 .ficha { width: 100%; border: 2px solid var(--nogal); border-radius: 8px; padding: 22px; display: flex; flex-direction: column; gap: 6px; }
 .ficha strong { font: 800 56px/1 var(--titulos); letter-spacing: 1px; overflow-wrap: anywhere; }
 .ficha .giros { font-weight: 600; color: var(--verde); font-size: 18px; }
-.resultado { flex: 1; background: var(--naranja); padding: 48px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
+.resultado { flex: 1; background-color: var(--naranja); padding: 48px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
 .resultado.sin { background: var(--nogal); color: var(--claro); }
 .tarjeta { width: 100%; background: #fff; color: var(--texto); border-radius: 8px; padding: 32px 20px; display: flex; flex-direction: column; gap: 10px; }
 .tarjeta strong { font: 800 48px/1 var(--titulos); color: var(--verde); overflow-wrap: anywhere; }
@@ -128,5 +128,6 @@ td input[type='checkbox'] { width: 20px; height: 20px; }
   .filaValidacion .primary, .filaValidacion .logout { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .disco { transition: none; }
+  .rueda-disco { transition: none; }
+  .luz { animation: none; }
 }

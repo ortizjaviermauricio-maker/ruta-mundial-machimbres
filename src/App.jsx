@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import './styles.css';
 import { supabase } from './supabase';
+import Rueda from './Rueda.jsx';
 import { CAMPANA, SEDES_RESPALDO, money, separarNombre, siguienteRotacion } from './campana';
 
 const Admin = lazy(() => import('./Admin.jsx'));
@@ -146,9 +147,10 @@ export default function App() {
 function Inicio({ config, patrocinadores, alParticipar }) {
   return (
     <div className="cuerpo oscuro centrado">
-      <h1 className="titular" style={{ fontSize: 50 }}>{CAMPANA.titular}</h1>
+      <h1 className="titular" style={{ fontSize: 44 }}>{CAMPANA.titular}</h1>
+      <p className="titular acento" style={{ fontSize: 25 }}>{CAMPANA.subtitulo}</p>
+      <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
-      <div className="tronco" aria-hidden="true"><span className="sello">39</span></div>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
       {Number(config.compraMinima) > 0 && <p className="nota">Compras desde {money(config.compraMinima)} en nuestras sedes</p>}
       {patrocinadores.length > 0 && <Aliados patrocinadores={patrocinadores} />}
@@ -322,11 +324,7 @@ function Ruleta({ token, factura, alCambiar, alRecuperar, alNuevaFactura }) {
       </h1>
       <p className="nota">Factura {factura.factura}</p>
       {factura.marcas && <p className="nota">También participas por beneficios de {factura.marcas}</p>}
-      <div className="ruleta" aria-hidden="true">
-        <div className="disco" style={{ transform: `rotate(${rotacion}deg)` }}>
-          <div className="centro"><span>39</span></div>
-        </div>
-      </div>
+      <Rueda rotacion={rotacion} />
       {sinGiros
         ? <button type="button" className="boton empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>
         : <button type="button" className="boton empuje" disabled={girando} onClick={girar}>GIRAR</button>}
