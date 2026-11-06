@@ -220,6 +220,30 @@ do $$ begin
   if (public.campana_publica()->'ranking')::text ~ 'Eva' then raise exception 'anulada sigue en ranking'; end if;
 end $$;
 
+-- ===== Ranking por compra acumulada =====
+update public.configuracion_campana set value = value || '{"validarEnCaja":false,"valorPorOportunidad":1000000,"puntosPorOportunidad":5000,"maxOportunidades":5,"compraMinima":500000}'::jsonb;
+set role anon;
+select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE901","valorCompra":900000}');
+select public.registrar_factura('{"nombre":"Rita","apellido":"Vega","celular":"3005550101","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE902","valorCompra":900000}');
+select public.registrar_factura('{"nombre":"Beto","apellido":"Paz","celular":"3005550102","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE903","valorCompra":20000000}');
+select public.registrar_factura('{"nombre":"Cora","apellido":"Luna","celular":"3005550103","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE904","valorCompra":700000}');
+select public.registrar_factura('{"nombre":"Ada","apellido":"Mora","celular":"3005550104","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE905","valorCompra":1100000}');
+select public.registrar_factura('{"nombre":"Ida","apellido":"Mesa","celular":"3005550105","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"factura":"FE906","valorCompra":1500000}');
+reset role;
+do $$
+declare
+  r jsonb := public.campana_publica()->'ranking';
+  beto jsonb := (select e from jsonb_array_elements(r) e where e->>'nombre' = 'Beto P.');
+  rita jsonb := (select e from jsonb_array_elements(r) e where e->>'nombre' = 'Rita V.');
+begin
+  if (beto->>'puntos')::bigint <> 100000 then raise exception 'sin tope: %', r; end if;
+  if (rita->>'puntos')::bigint <> 5000 or (rita->>'facturas')::int <> 2 then raise exception 'acumulado: %', r; end if;
+  if r::text ~ 'Cora' then raise exception 'menos de un giro acumulado no puntúa: %', r; end if;
+  if r->0->>'nombre' <> 'Beto P.' then raise exception 'orden: %', r; end if;
+  if (select array_agg(e->>'nombre' order by o) from jsonb_array_elements(r) with ordinality t(e, o) where e->>'nombre' in ('Rita V.', 'Ida M.', 'Ada M.'))
+     <> array['Rita V.', 'Ida M.', 'Ada M.'] then raise exception 'desempate por compra: %', r; end if;
+end $$;
+
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;
 set role anon;

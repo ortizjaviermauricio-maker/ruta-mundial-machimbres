@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compraParaGirar, girosPorCompra, puntos, separarNombre, siguienteRotacion } from '../src/campana.js';
+import { girosPorCompra, puntos, puntosPorCompra, separarNombre, siguienteRotacion } from '../src/campana.js';
 
 test('separa el nombre completo para el ranking', () => {
   assert.deepEqual(separarNombre('  Ana   Rojas '), { nombre: 'Ana', apellido: 'Rojas' });
@@ -15,9 +15,10 @@ test('la ruleta siempre avanza al menos seis vueltas', () => {
 
 const reglas = { compraMinima: 500000, valorPorOportunidad: 1000000, maxOportunidades: 5 };
 
-test('la compra anunciada siempre alcanza para un giro', () => {
-  assert.equal(compraParaGirar(reglas), 1000000);
-  assert.equal(compraParaGirar({ ...reglas, valorPorOportunidad: 400000 }), 500000);
+test('los puntos salen de la compra acumulada, sin tope', () => {
+  const config = { ...reglas, puntosPorOportunidad: 5000 };
+  assert.equal(puntosPorCompra(1800000, config), 5000);
+  assert.equal(puntosPorCompra(20000000, config), 100000);
 });
 
 test('calcula giros con tope por factura', () => {

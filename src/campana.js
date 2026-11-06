@@ -30,9 +30,10 @@ export function girosPorCompra(valor, config) {
   return Math.min(Math.floor(Number(valor || 0) / porGiro), Number(config.maxOportunidades || 0));
 }
 
-// Lo que se promete debe dar al menos un giro: el mínimo real es el mayor entre la compra mínima y el valor de un giro.
-export function compraParaGirar(config) {
-  return Math.max(Number(config.compraMinima || 0), Number(config.valorPorOportunidad || 0));
+// Misma fórmula del ranking en el servidor: compra acumulada del cliente, sin tope por factura.
+export function puntosPorCompra(total, config) {
+  const porGiro = Math.max(Number(config.valorPorOportunidad || 1), 1);
+  return Math.floor(Number(total || 0) / porGiro) * Number(config.puntosPorOportunidad || 0);
 }
 
 // El registro pide un solo campo; el servidor guarda nombre y apellido por separado para el ranking.

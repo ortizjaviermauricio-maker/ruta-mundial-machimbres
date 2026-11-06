@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
-import { money } from './campana';
+import { money, puntos, puntosPorCompra } from './campana';
 import { decodificarArchivo, parsearPremiosCSV } from './csv';
 
 const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids';
@@ -163,18 +163,18 @@ function Panel({ rol, correo }) {
 
   const metricas = useMemo(() => ({
     ventas: aprobadas.reduce((t, p) => t + Number(p.valor), 0),
-    puntos: aprobadas.reduce((t, p) => t + Number(p.puntos), 0),
+    puntos: [...aprobadas.reduce((m, p) => m.set(p.celular, (m.get(p.celular) || 0) + Number(p.valor)), new Map()).values()]
+      .reduce((t, total) => t + puntosPorCompra(total, config || {}), 0),
     ganados: ganadores.filter((g) => g.es_premio).length,
     entregados: ganadores.filter((g) => g.estado === 'entregado').length,
-  }), [aprobadas, ganadores]);
+  }), [aprobadas, ganadores, config]);
 
   const ventasPorSede = useMemo(() => {
     const mapa = new Map();
     aprobadas.forEach((p) => {
-      const fila = mapa.get(p.sede) || { sede: p.sede, prefijo: p.prefijo_factura, ventas: 0, facturas: 0, puntos: 0 };
+      const fila = mapa.get(p.sede) || { sede: p.sede, prefijo: p.prefijo_factura, ventas: 0, facturas: 0 };
       fila.ventas += Number(p.valor);
       fila.facturas += 1;
-      fila.puntos += Number(p.puntos);
       mapa.set(p.sede, fila);
     });
     return [...mapa.values()];
@@ -187,7 +187,6 @@ function Panel({ rol, correo }) {
       patrocinador: s.nombre,
       facturas: asociadas.length,
       ventas: asociadas.reduce((t, p) => t + Number(p.valor), 0),
-      puntos: asociadas.reduce((t, p) => t + Number(p.puntos), 0),
       premios_ganados: ganadores.filter((g) => g.es_premio && ids.has(g.participante_id)).length,
     };
   }).filter((f) => f.facturas > 0), [patrocinadores, aprobadas, ganadores]);
@@ -359,14 +358,14 @@ function Panel({ rol, correo }) {
             <div><span>Giros realizados</span><strong>{ganadores.length}</strong></div>
             <div><span>Premios ganados</span><strong>{metricas.ganados}</strong></div>
             <div><span>Premios entregados</span><strong>{metricas.entregados}</strong></div>
-            <div><span>Puntos generados</span><strong>{metricas.puntos}</strong></div>
+            <div><span>Puntos generados</span><strong>{puntos(metricas.puntos)}</strong></div>
           </div>
 
           <div className="card adminSubCard">
             <h2>Ventas por sede</h2>
             <div className="salesGrid">
               {ventasPorSede.length === 0 && <p className="muted">Aún no hay ventas registradas.</p>}
-              {ventasPorSede.map((v) => <div key={v.sede}><b>{v.prefijo}</b><strong>{money(v.ventas)}</strong><span>{v.facturas} factura(s) · {v.puntos} pts</span></div>)}
+              {ventasPorSede.map((v) => <div key={v.sede}><b>{v.prefijo}</b><strong>{money(v.ventas)}</strong><span>{v.facturas} factura(s)</span></div>)}
             </div>
           </div>
 
@@ -374,7 +373,7 @@ function Panel({ rol, correo }) {
             <h2>Ventas por patrocinador</h2>
             <div className="salesGrid">
               {ventasPorPatrocinador.length === 0 && <p className="muted">Aún no hay ventas asociadas a patrocinadores.</p>}
-              {ventasPorPatrocinador.map((v) => <div key={v.patrocinador}><b>{v.patrocinador}</b><strong>{money(v.ventas)}</strong><span>{v.facturas} factura(s) · {v.puntos} pts</span></div>)}
+              {ventasPorPatrocinador.map((v) => <div key={v.patrocinador}><b>{v.patrocinador}</b><strong>{money(v.ventas)}</strong><span>{v.facturas} factura(s)</span></div>)}
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import './styles.css';
 import { supabase } from './supabase';
 import Rueda from './Rueda.jsx';
-import { CAMPANA, SEDES_RESPALDO, compraParaGirar, girosPorCompra, money, puntos, separarNombre, siguienteRotacion } from './campana';
+import { CAMPANA, SEDES_RESPALDO, girosPorCompra, money, puntos, separarNombre, siguienteRotacion } from './campana';
 
 const Admin = lazy(() => import('./Admin.jsx'));
 
@@ -152,7 +152,7 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
-      {compraParaGirar(config) > 1 && <p className="nota">Compras desde {money(compraParaGirar(config))} en nuestras sedes</p>}
+      {Number(config.compraMinima) > 0 && <p className="nota">Compras desde {money(config.compraMinima)} suman al ranking. Cada {money(config.valorPorOportunidad)} te da un giro.</p>}
       <section className="compromiso">
         <p>{CAMPANA.compromiso}</p>
         <ul>{CAMPANA.pilares.map((pilar) => <li key={pilar}>{pilar}</li>)}</ul>
@@ -245,7 +245,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           )}
           {valor > 0 && (
             <div className="calculo">
-              <span>{giros > 0 ? 'Con esta compra tienes' : `Necesitas compras desde ${money(compraParaGirar(config))}`}</span>
+              <span>{valor < Number(config.compraMinima) ? `Compra mínima: ${money(config.compraMinima)}` : giros > 0 ? 'Con esta compra tienes' : `Suma al ranking. Cada ${money(config.valorPorOportunidad)} da un giro`}</span>
               <strong>{giros} {giros === 1 ? 'GIRO' : 'GIROS'}</strong>
             </div>
           )}
@@ -256,7 +256,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
               {CAMPANA.reglamentoPdf && <a href={CAMPANA.reglamentoPdf} target="_blank" rel="noopener noreferrer">Ver reglamento</a>}
             </span>
           </label>
-          <button className="boton empuje" type="submit" disabled={enviando || !config.activa || giros === 0}>{enviando ? 'REGISTRANDO…' : 'CONTINUAR'}</button>
+          <button className="boton empuje" type="submit" disabled={enviando || !config.activa || valor < Number(config.compraMinima)}>{enviando ? 'REGISTRANDO…' : 'CONTINUAR'}</button>
         </form>
       </div>
     </>
@@ -315,6 +315,19 @@ function Ruleta({ token, factura, alCambiar, alRecuperar, alNuevaFactura }) {
         <div className="cuerpo centrado">
           <div className="ficha"><span className="nota">Factura</span><strong>{factura.factura}</strong></div>
           <p className="nota">{factura.nota || 'Acércate a la caja para revisarla.'}</p>
+          <button type="button" className="boton empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>
+        </div>
+      </>
+    );
+  }
+
+  if (factura.oportunidades === 0) {
+    return (
+      <>
+        <div className="barra"><h1>FACTURA REGISTRADA</h1></div>
+        <div className="cuerpo centrado">
+          <div className="ficha"><span className="nota">Factura</span><strong>{factura.factura}</strong></div>
+          <p className="nota">Esta compra no alcanza para un giro, pero se acumula en tu puntaje del ranking.</p>
           <button type="button" className="boton empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>
         </div>
       </>
@@ -440,9 +453,9 @@ function ComoFunciona({ config, sedes }) {
       <div className="barra"><h1>CÓMO FUNCIONA</h1></div>
       <div className="cuerpo legal">
         <ul>
-          <li>Compra mínima para participar: {money(compraParaGirar(config))}.</li>
+          <li>Compra mínima para participar: {money(config.compraMinima)}.</li>
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
-          <li>Cada giro suma {puntos(config.puntosPorOportunidad)} puntos para el ranking.</li>
+          <li>El ranking suma tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
           <li>Cada factura se registra una sola vez y gira de inmediato.</li>
           <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>
