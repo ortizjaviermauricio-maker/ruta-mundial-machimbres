@@ -130,6 +130,7 @@ function Panel({ rol, correo }) {
   const [valores, setValores] = useState({});
   const [formPatrocinador, setFormPatrocinador] = useState(PATROCINADOR_VACIO);
   const [claves, setClaves] = useState({ nueva: '', confirmar: '' });
+  const [sedePorcentaje, setSedePorcentaje] = useState('');
 
   const cargar = useCallback(async () => {
     const [p, g] = await Promise.all([
@@ -157,7 +158,10 @@ function Panel({ rol, correo }) {
     return () => window.clearInterval(intervalo);
   }, [cargar]);
 
-  const porcentajes = useMemo(() => porcentajesPremios(premios), [premios]);
+  const sedesConfig = useMemo(() => config?.sedes || [], [config]);
+  const sedeVista = sedePorcentaje || sedesConfig[0]?.nombre || '';
+  // El % real depende de la sede de la factura: cuentan los premios generales más los de esa sede.
+  const porcentajes = useMemo(() => porcentajesPremios(premios, sedeVista || null), [premios, sedeVista]);
   const pendientes = useMemo(() => participantes.filter((p) => p.estado === 'pendiente').reverse(), [participantes]);
   const aprobadas = useMemo(() => participantes.filter((p) => p.estado === 'aprobada'), [participantes]);
   const porEntregar = useMemo(() => ganadores.filter((g) => g.estado === 'pendiente'), [ganadores]);
@@ -239,7 +243,7 @@ function Panel({ rol, correo }) {
     if (!archivo) return;
     try {
       const contenido = decodificarArchivo(await archivo.arrayBuffer());
-      const { premios: nuevos, advertencias } = parsearPremiosCSV(contenido, patrocinadores);
+      const { premios: nuevos, advertencias } = parsearPremiosCSV(contenido, patrocinadores, sedesConfig);
       const aviso = advertencias.length ? `\n\nAdvertencias:\n${advertencias.join('\n')}` : '';
       if (!confirm(`Se reemplazarán los premios actuales por ${nuevos.length} del archivo.${aviso}\n\n¿Continuar?`)) return;
       const { error } = await supabase.rpc('reemplazar_premios', { p_premios: nuevos });
@@ -437,14 +441,21 @@ function Panel({ rol, correo }) {
 
           <div className="card adminSubCard">
             <h2>Premios y probabilidades</h2>
-            <p className="muted">Los cambios se guardan al salir de cada campo. El cliente no ve las probabilidades. Si la columna Probabilidad suma 100, cada valor es su porcentaje; si no, el % real se recalcula. Un premio agotado sale del cálculo.</p>
+            <p className="muted">Los cambios se guardan al salir de cada campo. El cliente no ve las probabilidades. Si la columna Probabilidad suma 100, cada valor es su porcentaje; si no, el % real se recalcula. Un premio agotado sale del cálculo. Un premio con sede solo sale en facturas de esa sede; los generales salen en todas.</p>
             <div className="adminGrid">
               <button onClick={descargarPremios}>{premios.length ? 'Descargar premios CSV' : 'Descargar plantilla CSV'}</button>
               <label className="uploadBtn">Subir CSV premios<input type="file" accept=".csv" onChange={subirCSV} /></label>
+              {sedesConfig.length > 0 && (
+                <label>Ver % para sede
+                  <select value={sedeVista} onChange={(e) => setSedePorcentaje(e.target.value)}>
+                    {sedesConfig.map((s) => <option key={s.nombre} value={s.nombre}>{s.nombre}</option>)}
+                  </select>
+                </label>
+              )}
             </div>
             <div className="tableWrap">
               <table>
-                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad</th><th>% real</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th></tr></thead>
+                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad</th><th>% real</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th><th>Sede</th></tr></thead>
                 <tbody>
                   {premios.map((p) => (
                     <tr key={`${p.id}-${p.cantidad}-${p.peso}`}>
@@ -459,6 +470,13 @@ function Panel({ rol, correo }) {
                         <select value={p.patrocinador_id || ''} onChange={(e) => actualizarPremio(p.id, 'patrocinador_id', e.target.value ? Number(e.target.value) : null)}>
                           <option value="">General</option>
                           {patrocinadores.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <select value={p.sede || ''} onChange={(e) => actualizarPremio(p.id, 'sede', e.target.value || null)}>
+                          <option value="">General</option>
+                          {sedesConfig.map((s) => <option key={s.nombre} value={s.nombre}>{s.nombre}</option>)}
+                          {p.sede && !sedesConfig.some((s) => s.nombre === p.sede) && <option value={p.sede}>{p.sede} (no está en configuración)</option>}
                         </select>
                       </td>
                     </tr>

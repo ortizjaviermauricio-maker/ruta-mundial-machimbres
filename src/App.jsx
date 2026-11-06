@@ -129,7 +129,7 @@ export default function App() {
         )}
         {vista === 'Ranking' && <Ranking ranking={ranking} />}
         {vista === 'Más' && <Mas alElegir={setVista} />}
-        {vista === 'Premios' && <Premios premios={premios} />}
+        {vista === 'Premios' && <Premios premios={premios} sedes={sedes} />}
         {vista === 'Cómo funciona' && <ComoFunciona config={config} sedes={sedes} />}
         {vista === 'Reglamento' && <Reglamento />}
         {vista === 'Sedes' && <Sedes sedes={sedes} />}
@@ -480,7 +480,11 @@ function Mas({ alElegir }) {
   );
 }
 
-function Premios({ premios }) {
+function Premios({ premios, sedes }) {
+  const etiquetaSede = (nombre) => {
+    const sede = sedes.find((s) => s.nombre === nombre);
+    return `Solo sede ${sede?.prefijo || nombre}`;
+  };
   return (
     <>
       <div className="barra"><h1>PREMIOS</h1></div>
@@ -489,7 +493,7 @@ function Premios({ premios }) {
         <div>
           {premios.map((p) => (
             <div className="fila" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }} key={p.id}>
-              <div>{p.nombre}<small>{p.categoria}</small></div>
+              <div>{p.nombre}<small>{p.categoria}{p.sede ? ` · ${etiquetaSede(p.sede)}` : ''}</small></div>
               <strong>{p.ilimitado ? '' : p.stock}</strong>
             </div>
           ))}

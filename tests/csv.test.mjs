@@ -58,8 +58,53 @@ test('el CSV descargado se puede volver a subir', () => {
   assert.equal(premios.length, 3);
   assert.deepEqual(
     { ...premios[1] },
-    { premio: 'Gorra; roja', categoria: 'Premio', cantidad: 5, peso: 30, visible_cliente: true, entrega_premio: true, activo: true, patrocinador_id: 1 },
+    { premio: 'Gorra; roja', categoria: 'Premio', cantidad: 5, peso: 30, visible_cliente: true, entrega_premio: true, activo: true, patrocinador_id: 1, sede: null },
   );
   assert.equal(premios[0].entrega_premio, false);
   assert.equal(premios[0].visible_cliente, false);
+});
+
+const sedes = [
+  { nombre: 'FE Machimbres y Maderas S.A.S.', prefijo: 'FE' },
+  { nombre: 'FD DEKO LÁMINAS', prefijo: 'FD' },
+  { nombre: 'STFD Satélite', prefijo: 'STFD' },
+];
+
+test('la columna sede es opcional y General o vacío quedan como premio general', () => {
+  const csv = 'nombre;probabilidad;sede\nSet Bosch;1;FD DEKO LÁMINAS\nGorra;1;General\nTermo;1;\nSet Dewalt;1;stfd satélite';
+  const { premios, advertencias } = parsearPremiosCSV(csv, [], sedes);
+  assert.deepEqual(premios.map((p) => p.sede), ['FD DEKO LÁMINAS', null, null, 'STFD Satélite']);
+  assert.deepEqual(advertencias, []);
+  assert.equal(parsearPremiosCSV('nombre;probabilidad\nGorra;1').premios[0].sede, null);
+});
+
+test('una sede desconocida queda general con advertencia', () => {
+  const { premios, advertencias } = parsearPremiosCSV('nombre;probabilidad;sede\nSet Bosch;1;Bogotá', [], sedes);
+  assert.equal(premios[0].sede, null);
+  assert.match(advertencias[0], /Set Bosch.*Bogotá.*general/);
+});
+
+const porSede = [
+  { id: 'g', premio: 'Sigue intentando', peso: 50, entrega_premio: false, cantidad: 0, sede: null },
+  { id: 'fe', premio: 'Bosch FE', peso: 25, entrega_premio: true, cantidad: 1, sede: 'FE Machimbres y Maderas S.A.S.' },
+  { id: 'fd', premio: 'Dewalt FD', peso: 50, entrega_premio: true, cantidad: 1, sede: 'FD DEKO LÁMINAS' },
+];
+
+test('el porcentaje real por sede solo cuenta los generales y los de esa sede', () => {
+  const fe = porcentajesPremios(porSede, 'FE Machimbres y Maderas S.A.S.');
+  assert.ok(Math.abs(fe.g - 66.67) < 0.01);
+  assert.ok(Math.abs(fe.fe - 33.33) < 0.01);
+  assert.equal(fe.fd, 0);
+  const stfd = porcentajesPremios(porSede, 'STFD Satélite');
+  assert.equal(stfd.g, 100);
+  assert.equal(stfd.fe + stfd.fd, 0);
+  const todos = porcentajesPremios(porSede);
+  assert.equal(todos.g, 40);
+});
+
+test('la sede sobrevive a descargar y volver a subir el CSV', () => {
+  const csv = premiosACSV(porSede, []);
+  assert.match(csv.split('\r\n')[0], /;sede$/);
+  const { premios } = parsearPremiosCSV(csv, [], sedes);
+  assert.deepEqual(premios.map((p) => p.sede), [null, 'FE Machimbres y Maderas S.A.S.', 'FD DEKO LÁMINAS']);
 });

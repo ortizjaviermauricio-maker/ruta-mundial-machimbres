@@ -68,7 +68,8 @@ function claveTexto(texto) {
 }
 
 // Devuelve { premios, advertencias } o lanza un Error con un mensaje para el administrador.
-export function parsearPremiosCSV(contenido, patrocinadores = []) {
+// `sedes` (opcional) es la lista de configuracion_campana.sedes; una sede desconocida queda como premio general.
+export function parsearPremiosCSV(contenido, patrocinadores = [], sedes = []) {
   const lineas = contenido.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lineas.length < 2) throw new Error('El archivo está vacío.');
 
@@ -95,6 +96,15 @@ export function parsearPremiosCSV(contenido, patrocinadores = []) {
       advertencias.push(`${premio}: no existe el patrocinador "${marca}"; quedó como premio general.`);
     }
 
+    const sedeTexto = String(fila.sede || '').trim();
+    const sedeGeneral = !sedeTexto || claveTexto(sedeTexto) === 'general';
+    const sedeConocida = sedeGeneral
+      ? null
+      : sedes.find((s) => claveTexto(s.nombre) === claveTexto(sedeTexto) || claveTexto(s.prefijo) === claveTexto(sedeTexto));
+    if (!sedeGeneral && !sedeConocida) {
+      advertencias.push(`${premio}: no existe la sede "${sedeTexto}"; quedó como premio general.`);
+    }
+
     const peso = normalizarNumero(fila.probabilidad || fila.peso, -1);
     if (peso < 0) throw new Error(`La probabilidad del premio "${premio}" no es válida.`);
 
@@ -109,6 +119,7 @@ export function parsearPremiosCSV(contenido, patrocinadores = []) {
       entrega_premio: !(esSinPremio || normalizarBooleano(fila.ilimitado, false)),
       activo: true,
       patrocinador_id: patrocinador?.id || null,
+      sede: sedeConocida?.nombre || null,
     };
   });
 
@@ -117,10 +128,13 @@ export function parsearPremiosCSV(contenido, patrocinadores = []) {
 
 // Porcentaje real de cada premio: su peso entre la suma de los que pueden salir.
 // Es el caso de una factura con todas las marcas; sin una marca, sus premios no participan.
-export function porcentajesPremios(premios) {
-  const participa = (p) => p.activo !== false && Number(p.peso) > 0 && (!p.entrega_premio || Number(p.cantidad) > 0);
+// Con `sede`, solo cuentan los premios generales y los de esa sede (los demás quedan en 0).
+// Sin `sede`, se ignora el filtro por sede.
+export function porcentajesPremios(premios, sede = null) {
+  const deLaSede = (p) => !sede || !p.sede || p.sede === sede;
+  const participa = (p) => deLaSede(p) && p.activo !== false && Number(p.peso) > 0 && (!p.entrega_premio || Number(p.cantidad) > 0);
   const total = premios.filter(participa).reduce((suma, p) => suma + Number(p.peso), 0);
-  return Object.fromEntries(premios.map((p) => [p.id, participa(p) ? (Number(p.peso) / total) * 100 : 0]));
+  return Object.fromEntries(premios.map((p) => [p.id, participa(p) && total > 0 ? (Number(p.peso) / total) * 100 : 0]));
 }
 
 function celdaCSV(valor) {
@@ -128,7 +142,7 @@ function celdaCSV(valor) {
   return /[;"\n]/.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
 }
 
-export const ENCABEZADOS_PREMIOS = ['nombre', 'categoria', 'stock', 'probabilidad', 'visible', 'ilimitado', 'patrocinador'];
+export const ENCABEZADOS_PREMIOS = ['nombre', 'categoria', 'stock', 'probabilidad', 'visible', 'ilimitado', 'patrocinador', 'sede'];
 
 // CSV con las mismas columnas que recibe parsearPremiosCSV, para editarlo en Excel y volverlo a subir.
 export function premiosACSV(premios, patrocinadores = []) {
@@ -140,6 +154,7 @@ export function premiosACSV(premios, patrocinadores = []) {
     p.visible_cliente ? 'TRUE' : 'FALSE',
     p.entrega_premio ? 'FALSE' : 'TRUE',
     patrocinadores.find((s) => Number(s.id) === Number(p.patrocinador_id))?.nombre || 'General',
+    p.sede || 'General',
   ]);
   return [ENCABEZADOS_PREMIOS, ...filas].map((fila) => fila.map(celdaCSV).join(';')).join('\r\n');
 }

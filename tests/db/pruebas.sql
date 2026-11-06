@@ -300,6 +300,85 @@ begin
   if (select numero_documento from public.autorizaciones_datos where factura = 'FE922') is not null then raise exception 'la recurrente no guarda documento'; end if;
 end $$;
 
+-- ===== Premios por sede =====
+update public.configuracion_campana set value = value || '{"validarEnCaja":false,"unPremioPorFactura":false,"valorPorOportunidad":1000000,"maxOportunidades":5,"compraMinima":500000}'::jsonb;
+delete from public.premios where true;
+-- La sede debe existir en la configuración; vacío o "General" queda como premio general.
+select pg_temp.falla($$insert into public.premios (premio, cantidad, peso, sede) values ('X', 1, 1, 'Sede fantasma')$$, 'no existe');
+insert into public.premios (premio, cantidad, peso, sede) values ('Vacía', 1, 0, '  '), ('Gen', 1, 0, 'General');
+do $$ begin
+  if exists (select 1 from public.premios where sede is not null) then raise exception 'sede vacía o General debía quedar null'; end if;
+end $$;
+delete from public.premios where true;
+-- El set exclusivo de FD tiene un peso enorme: aun así una factura FE nunca puede ganarlo.
+insert into public.premios (premio, cantidad, peso, entrega_premio, sede) values
+  ('Set Dewalt FD', 100, 1000000, true, 'DEKO LÁMINAS'),
+  ('Set Bosch FE', 100, 1, true, 'Machimbres y Maderas S.A.S.');
+select pg_temp.falla($$update public.premios set sede = 'Otra sede' where premio = 'Set Bosch FE'$$, 'no existe');
+update public.premios set cantidad = cantidad where true; -- descontar inventario no revalida la sede
+set role anon;
+do $$
+declare
+  base jsonb := '{"apellido":"Sede","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","valorCompra":5000000}';
+  r jsonb; g jsonb; i int;
+begin
+  r := public.registrar_factura(base || '{"nombre":"Fede","celular":"3005550401","sede":"Machimbres y Maderas S.A.S.","factura":"FE931"}');
+  for i in 1..5 loop
+    g := public.girar(r->>'token');
+    if g->>'premio' <> 'Set Bosch FE' then raise exception 'FE ganó un premio ajeno: %', g; end if;
+  end loop;
+  r := public.registrar_factura(base || '{"nombre":"Dora","celular":"3005550402","sede":"DEKO LÁMINAS","factura":"FD13100"}');
+  for i in 1..5 loop
+    g := public.girar(r->>'token');
+    if g->>'premio' <> 'Set Dewalt FD' then raise exception 'FD ganó un premio ajeno: %', g; end if;
+  end loop;
+  -- Satélite no tiene premios propios ni generales: no puede llevarse los de otra sede.
+  r := public.registrar_factura(base || '{"nombre":"Saul","celular":"3005550403","sede":"Satélite","factura":"STFD2300"}');
+  insert into t values ('stfd', r->>'token');
+end $$;
+select pg_temp.falla(format('select public.girar(%L)', (select v from t where k = 'stfd')), 'No hay premios disponibles');
+reset role;
+do $$ begin
+  if exists (select 1 from public.ganadores where factura like 'FE%' and premio = 'Set Dewalt FD') then raise exception 'FE con premio FD'; end if;
+  if (select cantidad from public.premios where premio = 'Set Bosch FE') <> 95 then raise exception 'stock Bosch FE'; end if;
+  if (select cantidad from public.premios where premio = 'Set Dewalt FD') <> 95 then raise exception 'stock Dewalt FD'; end if;
+end $$;
+-- Un premio general sigue disponible para todas las sedes.
+update public.premios set peso = 0 where sede is not null;
+insert into public.premios (premio, cantidad, peso, entrega_premio) values ('Gorra general', 10, 1, true);
+set role anon;
+do $$
+declare
+  base jsonb := '{"apellido":"Sede","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","valorCompra":1000000}';
+  r jsonb; g jsonb;
+  d jsonb := '[{"c":"3005550411","s":"Machimbres y Maderas S.A.S.","f":"FE932"},{"c":"3005550412","s":"DEKO LÁMINAS","f":"FD13101"},{"c":"3005550413","s":"Satélite","f":"STFD2301"}]';
+  e jsonb;
+begin
+  for e in select * from jsonb_array_elements(d) loop
+    r := public.registrar_factura(base || jsonb_build_object('nombre', 'Gina', 'celular', e->>'c', 'sede', e->>'s', 'factura', e->>'f'));
+    g := public.girar(r->>'token');
+    if g->>'premio' <> 'Gorra general' then raise exception 'general no disponible en %: %', e->>'s', g; end if;
+  end loop;
+  -- La pantalla pública recibe la sede del premio.
+  if (select e2->>'sede' from jsonb_array_elements(public.campana_publica()->'premios') e2 where e2->>'nombre' = 'Set Dewalt FD') <> 'DEKO LÁMINAS'
+    then raise exception 'campana_publica sin sede'; end if;
+  if not exists (select 1 from jsonb_array_elements(public.campana_publica()->'premios') e2 where e2->>'nombre' = 'Gorra general' and e2->'sede' = 'null'::jsonb)
+    then raise exception 'premio general debía tener sede null'; end if;
+end $$;
+reset role;
+-- reemplazar_premios acepta sede y aborta todo si una sede no existe.
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+set role authenticated;
+select pg_temp.falla($$select public.reemplazar_premios('[{"premio":"A","peso":1,"sede":"DEKO LÁMINAS"},{"premio":"B","peso":1,"sede":"No existe"}]')$$, 'no existe');
+do $$ begin
+  if (select count(*) from public.premios) <> 3 then raise exception 'reemplazo con sede inválida no fue atómico'; end if;
+  if public.reemplazar_premios('[{"premio":"Bosch","peso":1,"cantidad":1,"sede":"Satélite"},{"premio":"Gorra","peso":1,"sede":""},{"premio":"Sigue intentando","peso":1,"entrega_premio":false}]') <> 3 then raise exception 'reemplazo'; end if;
+  if (select sede from public.premios where premio = 'Bosch') <> 'Satélite' then raise exception 'sede no guardada'; end if;
+  if (select sede from public.premios where premio = 'Gorra') is not null then raise exception 'sede vacía debía ser null'; end if;
+end $$;
+reset role;
+update public.configuracion_campana set value = value || '{"unPremioPorFactura":true}'::jsonb;
+
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;
 set role anon;
