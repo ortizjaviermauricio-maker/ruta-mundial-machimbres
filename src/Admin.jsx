@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 import { money, puntos, puntosPorCompra } from './campana';
 import { decodificarArchivo, parsearPremiosCSV, porcentajesPremios, premiosACSV } from './csv';
 
-const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids,prueba';
+const COLUMNAS_PARTICIPANTE = 'id,fecha,nombre,apellido,celular,email,sede,factura,prefijo_factura,valor,vendedor,puntos,oportunidades,usadas,estado,validado_por,validado_at,nota_validacion,marca_compra,patrocinadores_ids,valores_marca,prueba';
 const PATROCINADOR_VACIO = { nombre: '', empresa: '', responsable: '', telefono: '', correo: '', logo_url: '', pagina_web: '', instagram: '', whatsapp: '', activo: true, orden: 99 };
 
 function escapar(texto) {
@@ -183,6 +183,49 @@ function Panel({ rol, correo }) {
       mapa.set(p.sede, fila);
     });
     return [...mapa.values()];
+  }, [aprobadas]);
+
+  // Ranking con nombres, solo para el personal. Misma regla del servidor: compra acumulada por celular;
+  // la sede es donde el cliente más compró.
+  const rankingAdmin = useMemo(() => {
+    const armar = (valorDe) => {
+      const mapa = new Map();
+      aprobadas.forEach((p) => {
+        const v = valorDe(p);
+        if (!(v > 0)) return;
+        const fila = mapa.get(p.celular) || { nombre: `${p.nombre} ${p.apellido || ''}`.trim(), celular: p.celular, total: 0, facturas: 0, sedes: {} };
+        fila.total += v;
+        fila.facturas += 1;
+        fila.sedes[p.sede] = (fila.sedes[p.sede] || 0) + v;
+        mapa.set(p.celular, fila);
+      });
+      return [...mapa.values()]
+        .map((f) => ({ ...f, sede: Object.entries(f.sedes).sort((a, b) => b[1] - a[1])[0][0], puntos: puntosPorCompra(f.total, config || {}) }))
+        .sort((a, b) => b.total - a.total)
+        .map(({ sedes, ...f }, i) => ({ posicion: i + 1, ...f }));
+    };
+    return {
+      general: armar((p) => Number(p.valor)),
+      marcas: patrocinadores.filter((s) => s.activo).map((s) => ({
+        id: s.id, nombre: s.nombre, ganadores: s.ganadores_ranking || 2,
+        filas: armar((p) => Number((p.valores_marca || {})[s.id] || 0)),
+      })),
+    };
+  }, [aprobadas, patrocinadores, config]);
+
+  // Captación por sede: cada cliente cuenta en la sede de su primera factura de la campaña.
+  const jugadoresPorSede = useMemo(() => {
+    const primera = new Map();
+    [...aprobadas].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).forEach((p) => {
+      if (!primera.has(p.celular)) primera.set(p.celular, p);
+    });
+    const mapa = new Map();
+    primera.forEach((p) => {
+      const fila = mapa.get(p.sede) || { sede: p.sede, prefijo: p.prefijo_factura, jugadores: 0 };
+      fila.jugadores += 1;
+      mapa.set(p.sede, fila);
+    });
+    return [...mapa.values()].sort((a, b) => b.jugadores - a.jugadores);
   }, [aprobadas]);
 
   const ventasPorPatrocinador = useMemo(() => patrocinadores.map((s) => {
@@ -390,6 +433,47 @@ function Panel({ rol, correo }) {
           </div>
 
           <div className="card adminSubCard">
+            <h2>Jugadores captados por sede</h2>
+            <p className="muted">Bono de $200.000 para la sede que más jugadores capte. Cada cliente cuenta en la sede de su primera factura.</p>
+            <div className="salesGrid">
+              {jugadoresPorSede.length === 0 && <p className="muted">Aún no hay jugadores.</p>}
+              {jugadoresPorSede.map((v) => <div key={v.sede}><b>{v.prefijo}</b><strong>{v.jugadores}</strong><span>jugador(es)</span></div>)}
+            </div>
+          </div>
+
+          <div className="card adminSubCard">
+            <h2>Ranking con nombres (solo personal)</h2>
+            <div className="tableWrap">
+              <table>
+                <thead><tr><th>#</th><th>Cliente</th><th>Celular</th><th>Sede</th><th>Compra</th><th>Puntos</th></tr></thead>
+                <tbody>
+                  {rankingAdmin.general.slice(0, 20).map((f) => (
+                    <tr key={f.celular}><td>{f.posicion}</td><td>{f.nombre}</td><td>{f.celular}</td><td>{f.sede}</td><td>{money(f.total)}</td><td>{puntos(f.puntos)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rankingAdmin.marcas.map((m) => (
+              <div key={m.id}>
+                <h3>{m.nombre} · ganan {m.ganadores}</h3>
+                {m.filas.length === 0 && <p className="muted">Sin compras registradas de esta marca.</p>}
+                {m.filas.length > 0 && (
+                  <div className="tableWrap">
+                    <table>
+                      <thead><tr><th>#</th><th>Cliente</th><th>Celular</th><th>Sede</th><th>Valor {m.nombre}</th></tr></thead>
+                      <tbody>
+                        {m.filas.slice(0, 10).map((f) => (
+                          <tr key={f.celular}><td>{f.posicion}</td><td>{f.nombre}</td><td>{f.celular}</td><td>{f.sede}</td><td>{money(f.total)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="card adminSubCard">
             <h2>Ventas por patrocinador</h2>
             <div className="salesGrid">
               {ventasPorPatrocinador.length === 0 && <p className="muted">Aún no hay ventas asociadas a patrocinadores.</p>}
@@ -402,6 +486,8 @@ function Panel({ rol, correo }) {
             <button onClick={() => descargarExcel('ganadores', ganadores)}>Ganadores Excel</button>
             <button onClick={() => descargarExcel('ventas_por_sede', ventasPorSede)}>Ventas Excel</button>
             <button onClick={() => descargarExcel('ventas_por_patrocinador', ventasPorPatrocinador)}>Patrocinadores Excel</button>
+            <button onClick={() => descargarExcel('ranking_general', rankingAdmin.general)}>Ranking Excel</button>
+            <button onClick={() => descargarExcel('jugadores_por_sede', jugadoresPorSede)}>Jugadores Excel</button>
             <button onClick={() => descargarExcel('auditoria', auditoria)}>Auditoría Excel</button>
             <button onClick={generarBackup}>Backup JSON</button>
             <button onClick={borrarPruebas}>Borrar datos de prueba</button>
@@ -418,6 +504,7 @@ function Panel({ rol, correo }) {
                 <label>Código de prueba<input value={config.codigoPrueba || ''} onChange={(e) => setConfig({ ...config, codigoPrueba: e.target.value.trim() })} /></label>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.validarEnCaja)} onChange={(e) => setConfig({ ...config, validarEnCaja: e.target.checked })} /> Validar facturas en caja antes de girar</label>
                 <label className="checkLine"><input type="checkbox" checked={config.unPremioPorFactura !== false} onChange={(e) => setConfig({ ...config, unPremioPorFactura: e.target.checked })} /> Un solo premio por factura</label>
+                <label className="checkLine"><input type="checkbox" checked={Boolean(config.unPremioPorCliente)} onChange={(e) => setConfig({ ...config, unPremioPorCliente: e.target.checked })} /> Un solo premio por cliente en toda la campaña</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
                 <label>Cierre<input type="datetime-local" value={aFechaLocal(config.fechaFin)} onChange={(e) => setConfig({ ...config, fechaFin: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
                 {[['compraMinima', 'Compra mínima'], ['valorPorOportunidad', 'Valor por oportunidad'], ['puntosPorOportunidad', 'Puntos por oportunidad'], ['maxOportunidades', 'Máximo de oportunidades']].map(([campo, etiqueta]) => (
@@ -498,13 +585,14 @@ function Panel({ rol, correo }) {
             </form>
             <div className="tableWrap">
               <table>
-                <thead><tr><th>Logo</th><th>Patrocinador</th><th>Orden</th><th>Activo</th></tr></thead>
+                <thead><tr><th>Logo</th><th>Patrocinador</th><th>Orden</th><th>Ganadores ranking</th><th>Activo</th></tr></thead>
                 <tbody>
                   {patrocinadores.map((s) => (
                     <tr key={`${s.id}-${s.orden}`}>
                       <td>{s.logo_url ? <img className="miniLogo" src={s.logo_url} alt={s.nombre} /> : 'Sin logo'}</td>
                       <td><strong>{s.nombre}</strong></td>
                       <td><input type="number" defaultValue={s.orden} onBlur={(e) => Number(e.target.value) !== s.orden && actualizarPatrocinador(s.id, 'orden', Number(e.target.value))} /></td>
+                      <td><input type="number" min="1" max="10" defaultValue={s.ganadores_ranking || 2} onBlur={(e) => Number(e.target.value) !== s.ganadores_ranking && actualizarPatrocinador(s.id, 'ganadores_ranking', Number(e.target.value))} /></td>
                       <td><input type="checkbox" checked={s.activo} onChange={(e) => actualizarPatrocinador(s.id, 'activo', e.target.checked)} /></td>
                     </tr>
                   ))}

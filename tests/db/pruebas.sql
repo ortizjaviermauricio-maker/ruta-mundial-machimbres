@@ -24,11 +24,11 @@ insert into auth.users (id, email, email_confirmed_at) values
 insert into public.admins (email, rol) values ('caja@machimbres.test', 'validador'), ('sinconfirmar@machimbres.test', 'admin');
 
 update public.configuracion_campana set value = value || '{"activa":true,"validarEnCaja":true,"ultimaFacturaFE":100,"valorPorOportunidad":500000,"puntosPorOportunidad":100,"maxOportunidades":10}'::jsonb;
-insert into public.patrocinadores (nombre) values ('Ecofort');
+-- Moduofi (1), Primadera (2) y Ecofort (3) los crea la migración del 12 nov.
 insert into public.premios (premio, cantidad, peso, entrega_premio, visible_cliente, patrocinador_id) values
   ('Sigue intentando', 0, 50, false, false, null),
   ('Gorra', 3, 50, true, true, null),
-  ('Bono Ecofort', 100, 1000, true, true, 1);
+  ('Bono Ecofort', 100, 1000, true, true, 3);
 
 -- ===== Anónimo: no toca ninguna tabla =====
 set role anon;
@@ -59,7 +59,7 @@ do $$
 declare base jsonb := '{"nombre":"Ana María","apellido":"Rojas","celular":"300 123 4567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678"}';
 begin
   insert into t values ('t1', public.registrar_factura(base || '{"factura":"fe-101","valorCompra":1600000}')->>'token');
-  insert into t values ('t2', public.registrar_factura(base || '{"factura":"FE102","valorCompra":99000000,"patrocinadorIds":[1,999]}')->>'token');
+  insert into t values ('t2', public.registrar_factura(base || '{"factura":"FE102","valorCompra":99000000,"patrocinadorIds":[3,999]}')->>'token');
 end $$;
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE101","valorCompra":600000}')$$, 'ya fue registrada');
 select pg_temp.falla($$select public.registrar_factura('{"nombre":"A","celular":"3001234567","sede":"Machimbres y Maderas S.A.S.","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE100","valorCompra":600000}')$$, 'anterior al inicio');
@@ -143,8 +143,8 @@ end $$;
 do $$
 declare r text := (public.campana_publica()->'ranking')::text;
 begin
-  if r !~ 'Ana R\.' then raise exception 'ranking: %', r; end if;
-  if r ~ 'Rojas|FE10|300' then raise exception 'ranking expone datos: %', r; end if;
+  if r !~ 'Machimbres' then raise exception 'ranking sin sede: %', r; end if;
+  if r ~ 'Ana|Rojas|FE10|300|nombre' then raise exception 'ranking expone datos: %', r; end if;
 end $$;
 
 -- ===== Recuperar acceso =====
@@ -207,7 +207,7 @@ select pg_temp.falla($$select public.anular_premio(gen_random_uuid(), 'x')$$, 'p
 reset role;
 do $$ begin
   if (select cantidad from public.premios where premio = 'Taladro') <> 0 then raise exception 'stock'; end if;
-  if (public.campana_publica()->'ranking')::text !~ 'Eva' then raise exception 'ranking sin Eva'; end if;
+  if not exists (select 1 from public._ranking_general(public._config()) r where r.celular = '3005550000') then raise exception 'ranking sin Eva'; end if;
 end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002', false);
 set role authenticated;
@@ -217,7 +217,7 @@ reset role;
 do $$ begin
   if (select cantidad from public.premios where premio = 'Taladro') <> 1 then raise exception 'stock no devuelto'; end if;
   if (select estado from public.ganadores where factura = 'FE800') <> 'anulado' then raise exception 'estado'; end if;
-  if (public.campana_publica()->'ranking')::text ~ 'Eva' then raise exception 'anulada sigue en ranking'; end if;
+  if exists (select 1 from public._ranking_general(public._config()) r where r.celular = '3005550000') then raise exception 'anulada sigue en ranking'; end if;
 end $$;
 
 -- ===== Ranking por compra acumulada =====
@@ -232,16 +232,19 @@ select public.registrar_factura('{"nombre":"Ida","apellido":"Mesa","celular":"30
 reset role;
 do $$
 declare
-  r jsonb := public.campana_publica()->'ranking';
-  beto jsonb := (select e from jsonb_array_elements(r) e where e->>'nombre' = 'Beto P.');
-  rita jsonb := (select e from jsonb_array_elements(r) e where e->>'nombre' = 'Rita V.');
+  r jsonb := (select jsonb_agg(jsonb_build_object('n', x.celular, 'puntos', x.puntos, 'facturas', x.facturas, 'pos', x.posicion) order by x.posicion)
+              from public._ranking_general(public._config()) x where x.puntos > 0);
+  beto jsonb := (select e from jsonb_array_elements(r) e where e->>'n' = '3005550102');
+  rita jsonb := (select e from jsonb_array_elements(r) e where e->>'n' = '3005550101');
 begin
   if (beto->>'puntos')::bigint <> 100000 then raise exception 'sin tope: %', r; end if;
   if (rita->>'puntos')::bigint <> 5000 or (rita->>'facturas')::int <> 2 then raise exception 'acumulado: %', r; end if;
-  if r::text ~ 'Cora' then raise exception 'menos de un giro acumulado no puntúa: %', r; end if;
-  if r->0->>'nombre' <> 'Beto P.' then raise exception 'orden: %', r; end if;
-  if (select array_agg(e->>'nombre' order by o) from jsonb_array_elements(r) with ordinality t(e, o) where e->>'nombre' in ('Rita V.', 'Ida M.', 'Ada M.'))
-     <> array['Rita V.', 'Ida M.', 'Ada M.'] then raise exception 'desempate por compra: %', r; end if;
+  if r::text ~ '3005550103' then raise exception 'menos de un giro acumulado no puntúa: %', r; end if;
+  if r->0->>'n' <> '3005550102' then raise exception 'orden: %', r; end if;
+  if (select array_agg(e->>'n' order by o) from jsonb_array_elements(r) with ordinality t(e, o) where e->>'n' in ('3005550101', '3005550105', '3005550104'))
+     <> array['3005550101', '3005550105', '3005550104'] then raise exception 'desempate por compra: %', r; end if;
+  -- El ranking público trae puesto, sede y puntos, sin nombres.
+  if (public.campana_publica()->'ranking'->0) - 'posicion' - 'sede' - 'puntos' <> '{}'::jsonb then raise exception 'campos de más: %', public.campana_publica()->'ranking'->0; end if;
 end $$;
 
 -- ===== Modo pruebas y autorización solo para nuevos =====
@@ -301,7 +304,7 @@ begin
 end $$;
 
 -- ===== Premios por sede =====
-update public.configuracion_campana set value = value || '{"validarEnCaja":false,"unPremioPorFactura":false,"valorPorOportunidad":1000000,"maxOportunidades":5,"compraMinima":500000}'::jsonb;
+update public.configuracion_campana set value = value || '{"validarEnCaja":false,"unPremioPorFactura":false,"unPremioPorCliente":false,"valorPorOportunidad":1000000,"maxOportunidades":5,"compraMinima":500000}'::jsonb;
 delete from public.premios where true;
 -- La sede debe existir en la configuración; vacío o "General" queda como premio general.
 select pg_temp.falla($$insert into public.premios (premio, cantidad, peso, sede) values ('X', 1, 1, 'Sede fantasma')$$, 'no existe');
@@ -389,6 +392,55 @@ do $$ begin
   if (select sede from public.participantes where factura = 'FD4001') <> 'DEKO LÁMINAS' then raise exception 'FD debía ser DEKO LÁMINAS'; end if;
   if (select sede from public.participantes where factura = 'STFD4002') <> 'Satélite' then raise exception 'STFD debía ser Satélite'; end if;
 end $$;
+
+-- ===== Ranking por marca, mi posición y un premio por cliente =====
+update public.configuracion_campana set value = value || '{"activa":true,"modoPruebas":false,"validarEnCaja":false,"unPremioPorFactura":false,"unPremioPorCliente":true,"valorPorOportunidad":1000000,"puntosPorOportunidad":100,"maxOportunidades":5,"compraMinima":500000,"ultimaFacturaFE":0}'::jsonb;
+delete from public.premios where true;
+insert into public.premios (premio, cantidad, peso, entrega_premio) values ('Sigue intentando', 0, 1, false), ('Llavero', 100, 1000000, true);
+update public.patrocinadores set activo = false where nombre = 'Moduofi';
+set role anon;
+-- La suma de marcas no puede pasar del valor de la factura, ni usar una marca inactiva.
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Mar","celular":"3005550501","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE5001","valorCompra":1000000,"valoresMarca":{"2":800000,"3":300000}}')$$, 'no puede superar');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Mar","celular":"3005550501","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE5001","valorCompra":1000000,"valoresMarca":{"1":100000}}')$$, 'no participa');
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Mar","celular":"3005550501","aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678","factura":"FE5001","valorCompra":1000000,"valoresMarca":{"2":-5}}')$$, 'valor de cada marca');
+do $$
+declare
+  base jsonb := '{"aceptaReglamento":true,"autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"12345678"}';
+  a jsonb; b jsonb; c2 jsonb; g jsonb; i int; premios int := 0; rm jsonb; prim jsonb; yo jsonb;
+begin
+  a := public.registrar_factura(base || '{"nombre":"Mar","celular":"3005550501","factura":"FE5001","valorCompra":3000000,"valoresMarca":{"2":2000000,"3":"0"}}');
+  b := public.registrar_factura(base || '{"nombre":"Mar","celular":"3005550501","factura":"FD5002","valorCompra":2000000,"valoresMarca":{"2":"500000"}}');
+  c2 := public.registrar_factura(base || '{"nombre":"Leo","celular":"3005550502","factura":"STFD5003","valorCompra":9000000,"valoresMarca":{"2":1000000,"3":4000000}}');
+  -- Mar gana el Llavero en su primera factura; en adelante, incluso con otra factura, solo "Sigue intentando".
+  for i in 1..3 loop
+    g := public.girar(a->>'token'); if (g->>'es_premio')::boolean then premios := premios + 1; end if;
+  end loop;
+  for i in 1..2 loop
+    g := public.girar(b->>'token'); if (g->>'es_premio')::boolean then premios := premios + 1; end if;
+  end loop;
+  if premios <> 1 then raise exception 'un cliente ganó % premios', premios; end if;
+  -- Ranking por marca: Primadera la lidera Mar (2,5 M) sobre Leo (1 M); Ecofort solo Leo (el 0 no cuenta).
+  rm := public.campana_publica()->'rankingMarcas';
+  prim := (select e from jsonb_array_elements(rm) e where e->>'nombre' = 'Primadera');
+  if (prim->>'ganadores')::int <> 3 then raise exception 'Primadera premia 3: %', prim; end if;
+  if prim->'ranking'->0->>'sede' <> 'Machimbres y Maderas S.A.S.' or (prim->'ranking'->0->>'puntos')::int <> 200 then raise exception 'primadera: %', prim; end if;
+  if jsonb_array_length((select e->'ranking' from jsonb_array_elements(rm) e where e->>'nombre' = 'Ecofort')) <> 1 then raise exception 'ecofort: %', rm; end if;
+  if rm::text ~ 'Moduofi' then raise exception 'marca inactiva en el ranking: %', rm; end if;
+  if rm::text ~ 'Mar|Leo|3005' then raise exception 'ranking por marca expone datos: %', rm; end if;
+  -- Ranking general: todas las compras suman; la sede de Mar es donde más compró (FE).
+  if (public.mi_posicion(c2->>'token')->'general'->>'sede') <> 'Satélite' or (public.mi_posicion(c2->>'token')->'general'->>'puntos')::int <> 900 then raise exception 'general Leo: %', public.mi_posicion(c2->>'token'); end if;
+  yo := public.mi_posicion(b->>'token');
+  if (yo->'general'->>'sede') <> 'Machimbres y Maderas S.A.S.' or (yo->'general'->>'puntos')::int <> 500 then raise exception 'mi_posicion general: %', yo; end if;
+  if (select (e->>'posicion')::int from jsonb_array_elements(yo->'marcas') e where e->>'nombre' = 'Primadera') <> 1 then raise exception 'mi_posicion marca: %', yo; end if;
+  if public.mi_posicion('falso') is not null then raise exception 'token falso'; end if;
+end $$;
+select pg_temp.falla('select public._ranking_general(''{}'')', 'permission denied');
+reset role;
+do $$ begin
+  if (select valores_marca from public.participantes where factura = 'FE5001') <> '{"2": 2000000}'::jsonb then raise exception 'valores_marca'; end if;
+  if (select patrocinadores_ids from public.participantes where factura = 'FE5001') <> '{2}' then raise exception 'patrocinadores desde valores'; end if;
+end $$;
+update public.patrocinadores set activo = true where nombre = 'Moduofi';
 
 -- ===== Campaña cerrada =====
 update public.configuracion_campana set value = value || '{"activa":false}'::jsonb;

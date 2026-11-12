@@ -8,7 +8,7 @@ const Admin = lazy(() => import('./Admin.jsx'));
 
 const CLAVE_TOKEN = 'campana_factura_token';
 const NAVEGACION = ['Inicio', 'Participar', 'Ruleta', 'Ranking', 'Más'];
-const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', tipoDocumento: 'CC', numeroDocumento: '', patrocinadorIds: [] };
+const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', tipoDocumento: 'CC', numeroDocumento: '', patrocinadorIds: [], valoresMarca: {} };
 const CONFIG_VACIA = { activa: false, compraMinima: 0, valorPorOportunidad: 1, puntosPorOportunidad: 0, maxOportunidades: 0, sedes: SEDES_RESPALDO };
 const DURACION_GIRO = 3300;
 
@@ -31,12 +31,13 @@ function guardarToken(token) {
 
 export default function App() {
   const [vista, setVista] = useState('Inicio');
-  const [publico, setPublico] = useState({ config: CONFIG_VACIA, premios: [], patrocinadores: [], ranking: [] });
+  const [publico, setPublico] = useState({ config: CONFIG_VACIA, premios: [], patrocinadores: [], ranking: [], rankingMarcas: [] });
   const [errorCarga, setErrorCarga] = useState('');
   const [token, setToken] = useState(leerToken);
   const [factura, setFactura] = useState(null);
 
   const { config, premios, patrocinadores, ranking } = publico;
+  const rankingMarcas = publico.rankingMarcas || [];
   const sedes = config.sedes?.length ? config.sedes : SEDES_RESPALDO;
 
   const cargarPublico = useCallback(async () => {
@@ -127,7 +128,7 @@ export default function App() {
             alNuevaFactura={nuevaFactura}
           />
         )}
-        {vista === 'Ranking' && <Ranking ranking={ranking} />}
+        {vista === 'Ranking' && <Ranking ranking={ranking} rankingMarcas={rankingMarcas} sedes={sedes} token={token} />}
         {vista === 'Más' && <Mas alElegir={setVista} />}
         {vista === 'Premios' && <Premios premios={premios} sedes={sedes} />}
         {vista === 'Cómo funciona' && <ComoFunciona config={config} sedes={sedes} />}
@@ -216,19 +217,28 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   }, [form.celular]);
 
   function alternarMarca(id) {
-    setForm((prev) => ({
-      ...prev,
-      patrocinadorIds: prev.patrocinadorIds.includes(id) ? prev.patrocinadorIds.filter((x) => x !== id) : [...prev.patrocinadorIds, id],
-    }));
+    setForm((prev) => {
+      const activa = prev.patrocinadorIds.includes(id);
+      const valoresMarca = { ...prev.valoresMarca };
+      if (activa) delete valoresMarca[id];
+      return { ...prev, valoresMarca, patrocinadorIds: activa ? prev.patrocinadorIds.filter((x) => x !== id) : [...prev.patrocinadorIds, id] };
+    });
   }
+  const sumaMarcas = form.patrocinadorIds.reduce((t, id) => t + Number(form.valoresMarca[id] || 0), 0);
+  const marcasExcedidas = sumaMarcas > valor;
 
   async function enviar(e) {
     e.preventDefault();
+    if (marcasExcedidas) {
+      alert('La suma de las marcas no puede superar el valor de la factura.');
+      return;
+    }
     setEnviando(true);
     const { nombreCompleto, ...resto } = form;
     const { data, error } = await supabase.rpc('registrar_factura', {
       p_datos: {
         ...resto,
+        valoresMarca: Object.fromEntries(form.patrocinadorIds.map((id) => [id, Number(form.valoresMarca[id] || 0)])),
         autorizacion: !yaAutorizo && form.autorizacion,
         ...separarNombre(nombreCompleto),
         sede: sedeDetectada?.nombre || '',
@@ -264,15 +274,31 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           )}
           {patrocinadores.length > 0 && (
             <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-              <legend style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>Marcas aliadas de tu compra</legend>
+              <legend style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>¿Compraste láminas de estas marcas?</legend>
+              <p className="nota" style={{ fontSize: 14, margin: '0 0 6px' }}>Marca el proveedor y escribe cuánto de esta factura fue de esa marca. Suma para su ranking.</p>
               <div className="marcas">
                 {patrocinadores.map((p) => (
-                  <label key={p.id}>
-                    <input type="checkbox" checked={form.patrocinadorIds.includes(p.id)} onChange={() => alternarMarca(p.id)} />
-                    {p.logo_url ? <img src={p.logo_url} alt={p.nombre} /> : p.nombre}
-                  </label>
+                  <div key={p.id} className="marca-valor">
+                    <label>
+                      <input type="checkbox" checked={form.patrocinadorIds.includes(p.id)} onChange={() => alternarMarca(p.id)} />
+                      {p.logo_url ? <img src={p.logo_url} alt={p.nombre} /> : p.nombre}
+                    </label>
+                    {form.patrocinadorIds.includes(p.id) && (
+                      <input
+                        aria-label={`Valor de ${p.nombre} en esta factura`}
+                        placeholder={`Valor ${p.nombre}`}
+                        required
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        value={form.valoresMarca[p.id] || ''}
+                        onChange={(e) => setForm({ ...form, valoresMarca: { ...form.valoresMarca, [p.id]: e.target.value } })}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
+              {marcasExcedidas && <p className="nota" role="alert" style={{ fontSize: 14, color: '#b42318' }}>La suma de las marcas ({money(sumaMarcas)}) supera el valor de la factura.</p>}
             </fieldset>
           )}
           {valor > 0 && (
@@ -449,17 +475,41 @@ function Recuperar({ alRecuperar }) {
   );
 }
 
-function Ranking({ ranking }) {
+function Ranking({ ranking, rankingMarcas, sedes, token }) {
+  const [pestana, setPestana] = useState('general');
+  const [yo, setYo] = useState(null);
+  useEffect(() => {
+    if (!token) return;
+    supabase.rpc('mi_posicion', { p_token: token }).then(({ data }) => setYo(data || null));
+  }, [token, ranking]);
+  const marca = rankingMarcas.find((m) => String(m.id) === pestana);
+  const filas = marca ? marca.ranking : ranking;
+  const mia = marca ? yo?.marcas?.find((m) => String(m.id) === pestana) : yo?.general;
+  const prefijo = (nombre) => sedes.find((s) => s.nombre === nombre)?.prefijo;
   return (
     <>
       <div className="barra"><h1>RANKING</h1></div>
       <div className="cuerpo">
-        {ranking.length === 0 && <p className="nota">Aún no hay participantes.</p>}
+        {rankingMarcas.length > 0 && (
+          <div className="pestanas" role="tablist">
+            <button type="button" role="tab" aria-selected={pestana === 'general'} onClick={() => setPestana('general')}>General</button>
+            {rankingMarcas.map((m) => (
+              <button key={m.id} type="button" role="tab" aria-selected={pestana === String(m.id)} onClick={() => setPestana(String(m.id))}>{m.nombre}</button>
+            ))}
+          </div>
+        )}
+        <p className="nota" style={{ fontSize: 14 }}>
+          {marca
+            ? `Suma lo que registras de ${marca.nombre} en tus facturas. Ganan los ${marca.ganadores} primeros.`
+            : 'Suman todas tus compras registradas en cualquier sede.'}
+        </p>
+        {mia && <div className="mi-posicion">Tu posición: <b>{mia.posicion}</b> · {puntos(mia.puntos)} pts</div>}
+        {filas.length === 0 && <p className="nota">Aún no hay participantes.</p>}
         <div>
-          {ranking.map((p, i) => (
-            <div className="fila" key={`${p.nombre}-${i}`}>
-              <b>{i + 1}</b>
-              <div>{p.nombre}<small>{p.facturas} {p.facturas === 1 ? 'factura' : 'facturas'}</small></div>
+          {filas.map((p) => (
+            <div className="fila" key={p.posicion}>
+              <b>{p.posicion}</b>
+              <div>{p.sede}<small>{prefijo(p.sede) ? `Sede ${prefijo(p.sede)}` : 'Sede'}</small></div>
               <strong>{puntos(p.puntos)} pts</strong>
             </div>
           ))}
@@ -513,7 +563,10 @@ function ComoFunciona({ config, sedes }) {
         <ul>
           <li>Compra mínima para participar: {money(config.compraMinima)}.</li>
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
-          <li>El ranking suma tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
+          <li>El ranking general suma todas tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
+          <li>Si compras láminas de una marca aliada, marca el proveedor y su valor al registrar: sumas para el ranking de esa marca.</li>
+          {config.unPremioPorCliente && <li>Cada cliente gana máximo un premio de la ruleta en la campaña. Después, sus giros siguen sumando al ranking.</li>}
+          <li>El ranking público muestra puesto, sede y puntos, sin nombres.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
           <li>Cada factura se registra una sola vez y gira de inmediato.</li>
           <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>

@@ -148,3 +148,10 @@ td input[type='checkbox'] { width: 20px; height: 20px; }
   .rueda-disco { transition: none; }
   .luz { animation: none; }
 }
+
+.marca-valor { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+.marca-valor input[type="number"] { width: 100%; }
+.pestanas { display: flex; flex-wrap: wrap; gap: 6px; }
+.pestanas button { min-height: 40px; padding: 6px 14px; border: 1px solid var(--linea); border-radius: 999px; background: #fff; font: inherit; cursor: pointer; }
+.pestanas button[aria-selected="true"] { background: var(--nogal, #123F22); color: #fff; border-color: transparent; }
+.mi-posicion { padding: 10px 12px; border-radius: 6px; background: rgba(255, 194, 61, .18); font-size: 15px; }

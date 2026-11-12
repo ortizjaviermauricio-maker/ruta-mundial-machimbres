@@ -8,7 +8,7 @@ const psql = (sql) => run('psql', ['-h', '/tmp/pgruleta', '-p', puerto, '-U', 'p
 const valor = async (sql) => (await psql(sql)).stdout.trim().split('\n').pop();
 
 await psql(`delete from public.ganadores where true; delete from public.participantes where true; delete from public.premios where true;
-  update public.configuracion_campana set value = value || '{"activa":true,"unPremioPorFactura":false,"ultimaFacturaFE":0,"valorPorOportunidad":500000,"maxOportunidades":10}'::jsonb;
+  update public.configuracion_campana set value = value || '{"activa":true,"unPremioPorFactura":false,"unPremioPorCliente":false,"ultimaFacturaFE":0,"valorPorOportunidad":500000,"maxOportunidades":10}'::jsonb;
   insert into public.premios (premio, cantidad, peso, entrega_premio) values ('Unico', 5, 1000, true), ('Sigue intentando', 0, 1, false);`);
 
 // 3 giros de la misma factura lanzados 12 veces a la vez: solo 3 pueden pasar.
