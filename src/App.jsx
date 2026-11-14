@@ -439,7 +439,7 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
       <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
-      {resultado.es_premio && resultado.restantes > 0 && <p>Cada factura gana un solo premio, así que {resultado.restantes === 1 ? 'tu giro restante no dará' : `tus ${resultado.restantes} giros restantes no darán`} otro premio.</p>}
+      {resultado.es_premio && resultado.restantes > 0 && <p>Ya ganaste tu premio de la campaña: {resultado.restantes === 1 ? 'tu giro restante no dará' : `tus ${resultado.restantes} giros restantes no darán`} otro premio, pero tus compras siguen sumando al ranking.</p>}
       {resultado.restantes > 0
         ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>{resultado.es_premio ? 'USAR GIROS RESTANTES' : 'SEGUIR GIRANDO'}</button>
         : <button type="button" className="boton oscuro-b empuje" onClick={alNuevaFactura}>REGISTRAR OTRA FACTURA</button>}
