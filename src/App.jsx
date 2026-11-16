@@ -154,7 +154,7 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
-      {Number(config.compraMinima) > 0 && <p className="nota">Compras desde {money(config.compraMinima)} suman al ranking. Cada {money(config.valorPorOportunidad)} te da un giro.</p>}
+      <p className="nota">{Number(config.compraMinima) > 1 ? `Compras desde ${money(config.compraMinima)} suman al ranking.` : 'Registra todas tus compras: todas suman al ranking.'} Cada {money(config.valorPorOportunidad)} te da un giro.</p>
       <section className="compromiso">
         <p>{CAMPANA.compromiso}</p>
         <ul>{CAMPANA.pilares.map((pilar) => <li key={pilar}>{pilar}</li>)}</ul>
@@ -303,7 +303,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           )}
           {valor > 0 && (
             <div className="calculo">
-              <span>{valor < Number(config.compraMinima) ? `Compra mínima: ${money(config.compraMinima)}` : giros > 0 ? 'Con esta compra tienes' : `Suma al ranking. Cada ${money(config.valorPorOportunidad)} da un giro`}</span>
+              <span>{Number(config.compraMinima) > 1 && valor < Number(config.compraMinima) ? `Compra mínima: ${money(config.compraMinima)}` : giros > 0 ? 'Con esta compra tienes' : `Suma al ranking. Cada ${money(config.valorPorOportunidad)} da un giro`}</span>
               <strong>{giros} {giros === 1 ? 'GIRO' : 'GIROS'}</strong>
             </div>
           )}
@@ -573,7 +573,7 @@ function ComoFunciona({ config, sedes }) {
       <div className="barra"><h1>CÓMO FUNCIONA</h1></div>
       <div className="cuerpo legal">
         <ul>
-          <li>Compra mínima para participar: {money(config.compraMinima)}.</li>
+          <li>{Number(config.compraMinima) > 1 ? `Compra mínima para participar: ${money(config.compraMinima)}.` : 'Todas las compras se registran y suman al ranking, sin importar el valor.'}</li>
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
           <li>El ranking general suma todas tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
           <li>Si compras láminas de una marca aliada, marca el proveedor y su valor al registrar: sumas para el ranking de esa marca.</li>
