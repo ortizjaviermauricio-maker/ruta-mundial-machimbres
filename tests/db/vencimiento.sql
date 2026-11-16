@@ -136,4 +136,14 @@ select pg_temp.falla(format('select public.girar(%L)', (select t from tc)), 'no 
 reset role;
 update public.configuracion_campana set value = value - 'fechaFin';
 
+-- Sin límite diario: un cliente puede registrar muchas facturas el mismo día.
+set role anon;
+do $$ declare i int; begin
+  for i in 1..15 loop
+    perform public.registrar_factura(jsonb_build_object('mayorEdad',true,'nombre','Cliente Grande','autorizacion',true,'tipoDocumento','CC','numeroDocumento','71888001',
+      'celular','3201888001','sede','Satélite','factura','STFD98'||lpad(i::text,3,'0'),'valorCompra',600000));
+  end loop;
+end $$;
+reset role;
+
 \echo PRUEBAS_VENCIMIENTO_OK
