@@ -104,4 +104,9 @@ set role authenticated;
 do $$ begin perform public.vencer_premios(); end $$;
 reset role;
 
+-- Las reglas internas no se publican.
+do $$ begin
+  if public.campana_publica()::text ~ 'unPremio' then raise exception 'campana_publica expone la regla de un premio'; end if;
+end $$;
+
 \echo PRUEBAS_VENCIMIENTO_OK
