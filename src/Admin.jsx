@@ -133,6 +133,8 @@ function Panel({ rol, correo }) {
   const [sedePorcentaje, setSedePorcentaje] = useState('');
 
   const cargar = useCallback(async () => {
+    // Premios no reclamados a tiempo pasan a "vencido" y vuelven a la ruleta.
+    await supabase.rpc('vencer_premios');
     const [p, g] = await Promise.all([
       supabase.from('participantes').select(COLUMNAS_PARTICIPANTE).order('fecha', { ascending: false }),
       supabase.from('ganadores').select('*').order('fecha', { ascending: false }),
@@ -172,6 +174,7 @@ function Panel({ rol, correo }) {
       .reduce((t, total) => t + puntosPorCompra(total, config || {}), 0),
     ganados: ganadores.filter((g) => g.es_premio).length,
     entregados: ganadores.filter((g) => g.estado === 'entregado').length,
+    vencidos: ganadores.filter((g) => g.estado === 'vencido').length,
   }), [aprobadas, ganadores, config]);
 
   const ventasPorSede = useMemo(() => {
@@ -406,6 +409,7 @@ function Panel({ rol, correo }) {
               <strong>{g.premio}</strong>
               <small>{g.nombre} · {g.factura} · {g.sede} · {fecha(g.fecha)}</small>
               <small>Valor registrado: {money(participantes.find((p) => p.id === g.participante_id)?.valor)}</small>
+              {g.vence_at && <small style={{ fontWeight: 600 }}>Reclamar hasta: {new Date(new Date(g.vence_at).getTime() - 1000).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', timeZone: 'America/Bogota' })}</small>}
             </div>
             <button className="primary" onClick={() => entregar(g.id)}>Entregar</button>
             <button className="logout" onClick={() => anular(g.id)}>Anular</button>
@@ -421,6 +425,7 @@ function Panel({ rol, correo }) {
             <div><span>Giros realizados</span><strong>{ganadores.length}</strong></div>
             <div><span>Premios ganados</span><strong>{metricas.ganados}</strong></div>
             <div><span>Premios entregados</span><strong>{metricas.entregados}</strong></div>
+            <div><span>Vencidos sin reclamar</span><strong>{metricas.vencidos}</strong></div>
             <div><span>Puntos generados</span><strong>{puntos(metricas.puntos)}</strong></div>
           </div>
 
@@ -507,7 +512,7 @@ function Panel({ rol, correo }) {
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.unPremioPorCliente)} onChange={(e) => setConfig({ ...config, unPremioPorCliente: e.target.checked })} /> Un solo premio por cliente en toda la campaña</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
                 <label>Cierre<input type="datetime-local" value={aFechaLocal(config.fechaFin)} onChange={(e) => setConfig({ ...config, fechaFin: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
-                {[['compraMinima', 'Compra mínima'], ['valorPorOportunidad', 'Valor por oportunidad'], ['puntosPorOportunidad', 'Puntos por oportunidad'], ['maxOportunidades', 'Máximo de oportunidades']].map(([campo, etiqueta]) => (
+                {[['compraMinima', 'Compra mínima'], ['valorPorOportunidad', 'Valor por oportunidad'], ['puntosPorOportunidad', 'Puntos por oportunidad'], ['maxOportunidades', 'Máximo de oportunidades'], ['diasReclamo', 'Días para reclamar premio']].map(([campo, etiqueta]) => (
                   <label key={campo}>{etiqueta}<input type="number" min="0" value={config[campo] ?? 0} onChange={(e) => setConfig({ ...config, [campo]: Number(e.target.value) })} /></label>
                 ))}
                 {(config.sedes || []).map((sede) => {

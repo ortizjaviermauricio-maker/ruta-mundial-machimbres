@@ -430,6 +430,12 @@ function Ruleta({ token, factura, alCambiar, alRecuperar, alNuevaFactura }) {
   );
 }
 
+// Último día para reclamar: vence_at es la medianoche siguiente en Colombia.
+function fechaLimite(venceAt) {
+  const d = new Date(new Date(venceAt).getTime() - 1000);
+  return d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota' });
+}
+
 function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
   return (
     <div className={`resultado ${resultado.es_premio ? '' : 'sin'}`}>
@@ -439,6 +445,12 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
       <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
+      {resultado.es_premio && resultado.vence_at && (
+        <div className="tarjeta" role="alert">
+          <strong>Tienes {resultado.dias_reclamo || 8} días para reclamarlo: hasta el {fechaLimite(resultado.vence_at)}.</strong>
+          <span>Si no lo reclamas en ese plazo, pierdes el premio y vuelve a la ruleta para otros clientes.</span>
+        </div>
+      )}
       {resultado.es_premio && resultado.restantes > 0 && <p>Ya ganaste tu premio de la campaña: {resultado.restantes === 1 ? 'tu giro restante no dará' : `tus ${resultado.restantes} giros restantes no darán`} otro premio, pero tus compras siguen sumando al ranking.</p>}
       {resultado.restantes > 0
         ? <button type="button" className="boton oscuro-b empuje" onClick={alSeguir}>{resultado.es_premio ? 'USAR GIROS RESTANTES' : 'SEGUIR GIRANDO'}</button>
@@ -570,6 +582,7 @@ function ComoFunciona({ config, sedes }) {
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
           <li>Cada factura se registra una sola vez y gira de inmediato.</li>
           <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>
+          <li>Tienes {config.diasReclamo || 8} días calendario desde que ganas para reclamar el premio en la sede. Si no lo reclamas a tiempo, lo pierdes y el premio vuelve a la ruleta.</li>
         </ul>
       </div>
     </>

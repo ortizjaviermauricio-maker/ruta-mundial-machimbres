@@ -31,4 +31,5 @@ SQL
 
 for m in "$RAIZ"/supabase/migrations/*.sql; do "${PSQL[@]}" -f "$m"; done
 "${PSQL[@]}" -f "$RAIZ/tests/db/pruebas.sql"
+"${PSQL[@]}" -f "$RAIZ/tests/db/vencimiento.sql"
 node "$RAIZ/tests/db/concurrencia.mjs" "$PUERTO" postgres
