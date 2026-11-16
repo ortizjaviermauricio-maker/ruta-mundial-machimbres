@@ -577,8 +577,6 @@ function ComoFunciona({ config, sedes }) {
           <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
           <li>El ranking general suma todas tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
           <li>Si compras láminas de una marca aliada, marca el proveedor y su valor al registrar: sumas para el ranking de esa marca.</li>
-          {config.unPremioPorCliente && <li>Cada cliente gana máximo un premio de la ruleta en la campaña. Después, sus giros siguen sumando al ranking.</li>}
-          <li>El ranking público muestra puesto, sede y puntos, sin nombres.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>
           <li>Cada factura se registra una sola vez y gira de inmediato.</li>
           <li>Para reclamar un premio debes presentar la factura original y tu documento; sus datos deben coincidir con lo registrado.</li>
