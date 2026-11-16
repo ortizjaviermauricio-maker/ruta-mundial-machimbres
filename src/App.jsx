@@ -439,12 +439,12 @@ function fechaLimite(venceAt) {
 function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
   return (
     <div className={`resultado ${resultado.es_premio ? '' : 'sin'}`}>
-      <p className="titular" style={{ fontSize: 34 }}>{resultado.es_premio ? '¡GANASTE!' : 'ESTA VEZ NO FUE'}</p>
+      <p className="titular" style={{ fontSize: resultado.es_premio ? 34 : 26 }}>{resultado.es_premio ? '¡GANASTE!' : '¡GRACIAS POR CONSTRUIR HISTORIA CON NOSOTROS!'}</p>
       <div className="tarjeta">
-        <strong>{resultado.premio}</strong>
+        <strong>{resultado.es_premio ? resultado.premio : 'Esta vez no ganaste, pero sigue intentándolo.'}</strong>
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
-      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Gracias por ser parte de estos 39 años.'}</p>
+      <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Eres un cliente muy importante para Machimbres y Maderas. Gracias por ser parte de estos 39 años.'}</p>
       {resultado.es_premio && resultado.vence_at && (
         <div className="tarjeta" role="alert">
           <strong>Tienes {resultado.dias_reclamo || 8} días para reclamarlo: hasta el {fechaLimite(resultado.vence_at)}.</strong>
