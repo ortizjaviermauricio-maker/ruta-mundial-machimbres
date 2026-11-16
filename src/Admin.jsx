@@ -502,7 +502,6 @@ function Panel({ rol, correo }) {
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.modoPruebas)} onChange={(e) => setConfig({ ...config, modoPruebas: e.target.checked })} /> Modo pruebas: solo registra quien tenga el código</label>
                 <label>Código de prueba<input value={config.codigoPrueba || ''} onChange={(e) => setConfig({ ...config, codigoPrueba: e.target.value.trim() })} /></label>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.validarEnCaja)} onChange={(e) => setConfig({ ...config, validarEnCaja: e.target.checked })} /> Validar facturas en caja antes de girar</label>
-                <label className="checkLine"><input type="checkbox" checked={Boolean(config.modoObsequio)} onChange={(e) => setConfig({ ...config, modoObsequio: e.target.checked })} /> Ruleta sin azar: el obsequio lo define el valor de la factura (columna "Factura desde")</label>
                 <label className="checkLine"><input type="checkbox" checked={config.unPremioPorFactura !== false} onChange={(e) => setConfig({ ...config, unPremioPorFactura: e.target.checked })} /> Un solo premio por factura</label>
                 <label className="checkLine"><input type="checkbox" checked={Boolean(config.unPremioPorCliente)} onChange={(e) => setConfig({ ...config, unPremioPorCliente: e.target.checked })} /> Un solo premio por cliente en toda la campaña</label>
                 <label>Inicio<input type="datetime-local" value={aFechaLocal(config.fechaInicio)} onChange={(e) => setConfig({ ...config, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : null })} /></label>
@@ -542,14 +541,13 @@ function Panel({ rol, correo }) {
             </div>
             <div className="tableWrap">
               <table>
-                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Factura desde</th><th>Probabilidad</th><th>% real</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th><th>Sede</th></tr></thead>
+                <thead><tr><th>Premio</th><th>Categoría</th><th>Stock</th><th>Probabilidad</th><th>% real</th><th>Visible</th><th>Sin límite</th><th>Patrocinador</th><th>Sede</th></tr></thead>
                 <tbody>
                   {premios.map((p) => (
                     <tr key={`${p.id}-${p.cantidad}-${p.peso}`}>
                       <td><input defaultValue={p.premio} onBlur={(e) => e.target.value !== p.premio && actualizarPremio(p.id, 'premio', e.target.value)} /></td>
                       <td><input defaultValue={p.categoria} onBlur={(e) => e.target.value !== p.categoria && actualizarPremio(p.id, 'categoria', e.target.value)} /></td>
                       <td><input type="number" min="0" defaultValue={p.cantidad} onBlur={(e) => Number(e.target.value) !== p.cantidad && actualizarPremio(p.id, 'cantidad', Number(e.target.value))} /></td>
-                      <td><input type="number" min="0" step="100000" defaultValue={p.compra_minima ?? 0} onBlur={(e) => Number(e.target.value) !== Number(p.compra_minima) && actualizarPremio(p.id, 'compra_minima', Number(e.target.value))} /></td>
                       <td><input type="number" min="0" step="0.1" defaultValue={p.peso} onBlur={(e) => Number(e.target.value) !== Number(p.peso) && actualizarPremio(p.id, 'peso', Number(e.target.value))} /></td>
                       <td><strong>{porcentajes[p.id].toLocaleString('es-CO', { maximumFractionDigits: 1 })}%</strong></td>
                       <td><input type="checkbox" checked={p.visible_cliente} onChange={(e) => actualizarPremio(p.id, 'visible_cliente', e.target.checked)} /></td>

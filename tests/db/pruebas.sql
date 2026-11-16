@@ -23,7 +23,7 @@ insert into auth.users (id, email, email_confirmed_at) values
   ('00000000-0000-0000-0000-000000000004', 'sinconfirmar@machimbres.test', null);
 insert into public.admins (email, rol) values ('caja@machimbres.test', 'validador'), ('sinconfirmar@machimbres.test', 'admin');
 
-update public.configuracion_campana set value = value || '{"modoObsequio":false,"activa":true,"validarEnCaja":true,"ultimaFacturaFE":100,"valorPorOportunidad":500000,"puntosPorOportunidad":100,"maxOportunidades":10}'::jsonb;
+update public.configuracion_campana set value = value || '{"activa":true,"validarEnCaja":true,"ultimaFacturaFE":100,"valorPorOportunidad":500000,"puntosPorOportunidad":100,"maxOportunidades":10}'::jsonb;
 -- Moduofi (1), Primadera (2) y Ecofort (3) los crea la migración del 12 nov.
 insert into public.premios (premio, cantidad, peso, entrega_premio, visible_cliente, patrocinador_id) values
   ('Sigue intentando', 0, 50, false, false, null),

@@ -154,7 +154,7 @@ function Inicio({ config, patrocinadores, alParticipar }) {
       <Rueda />
       <p className="nota">{CAMPANA.invitacion}</p>
       <button type="button" className="boton" onClick={alParticipar}>REGISTRAR MI FACTURA</button>
-      <p className="nota">{Number(config.compraMinima) > 1 ? `Compras desde ${money(config.compraMinima)} suman al ranking.` : 'Registra todas tus compras: todas suman al ranking.'} {config.modoObsequio ? `Facturas desde ${money(config.valorPorOportunidad)} giran la ruleta y reciben un obsequio según el valor de la compra.` : `Cada ${money(config.valorPorOportunidad)} te da un giro.`}</p>
+      <p className="nota">{Number(config.compraMinima) > 1 ? `Compras desde ${money(config.compraMinima)} suman al ranking.` : 'Registra todas tus compras: todas suman al ranking.'} Cada {money(config.valorPorOportunidad)} te da un giro.</p>
       <section className="compromiso">
         <p>{CAMPANA.compromiso}</p>
         <ul>{CAMPANA.pilares.map((pilar) => <li key={pilar}>{pilar}</li>)}</ul>
@@ -454,7 +454,7 @@ function Resultado({ resultado, factura, alSeguir, alNuevaFactura }) {
     <div className={`resultado ${resultado.es_premio ? '' : 'sin'}`}>
       <p className="titular" style={{ fontSize: resultado.es_premio ? 34 : 26 }}>{resultado.es_premio ? '¡GANASTE!' : '¡GRACIAS POR CONSTRUIR HISTORIA CON NOSOTROS!'}</p>
       <div className="tarjeta">
-        <strong>{resultado.es_premio ? resultado.premio : 'Tus compras siguen sumando en el ranking.'}</strong>
+        <strong>{resultado.es_premio ? resultado.premio : 'Esta vez no ganaste, pero sigue intentándolo.'}</strong>
         {factura && <span className="nota">Factura {factura.factura}</span>}
       </div>
       <p style={{ fontWeight: 600 }}>{resultado.es_premio ? 'Reclámalo en caja con tu factura original y tu documento.' : 'Eres un cliente muy importante para Machimbres y Maderas. Gracias por ser parte de estos 39 años.'}</p>
@@ -569,7 +569,7 @@ function Premios({ premios, sedes }) {
         <div>
           {premios.map((p) => (
             <div className="fila" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }} key={p.id}>
-              <div>{p.nombre}<small>{Number(p.desde) > 0 ? `Facturas desde ${money(p.desde)}` : p.categoria}{p.sede ? ` · ${etiquetaSede(p.sede)}` : ''}</small></div>
+              <div>{p.nombre}<small>{p.categoria}{p.sede ? ` · ${etiquetaSede(p.sede)}` : ''}</small></div>
               <strong>{p.ilimitado ? '' : p.stock}</strong>
             </div>
           ))}
@@ -586,9 +586,7 @@ function ComoFunciona({ config, sedes }) {
       <div className="cuerpo legal">
         <ul>
           <li>{Number(config.compraMinima) > 1 ? `Compra mínima para participar: ${money(config.compraMinima)}.` : 'Todas las compras se registran y suman al ranking, sin importar el valor.'}</li>
-          {config.modoObsequio
-            ? <li>Cada factura desde {money(config.valorPorOportunidad)} te da un giro de la ruleta. La ruleta es de entretenimiento: tu obsequio depende del valor de la factura (mira los rangos en Premios), hasta agotar existencias en cada sede.</li>
-            : <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>}
+          <li>Cada {money(config.valorPorOportunidad)} te da un giro, hasta {config.maxOportunidades} por factura.</li>
           <li>El ranking general suma todas tus compras registradas: {puntos(config.puntosPorOportunidad)} puntos por cada {money(config.valorPorOportunidad)} acumulado, sin tope.</li>
           <li>Si compras láminas de una marca aliada, marca el proveedor y su valor al registrar: sumas para el ranking de esa marca.</li>
           <li>Prefijos de factura: {sedes.map((s) => s.prefijo).join(', ')}, sin guion.</li>

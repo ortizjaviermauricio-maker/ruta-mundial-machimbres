@@ -124,45 +124,4 @@ do $$ begin
   if public.campana_publica()::text ~ 'unPremio' then raise exception 'campana_publica expone la regla de un premio'; end if;
 end $$;
 
-
--- ===== Ruleta sin azar: obsequio según el valor de la factura =====
-update public.configuracion_campana set value = value || '{"modoObsequio":true,"maxOportunidades":1,"valorPorOportunidad":1500000,"compraMinima":1,"unPremioPorCliente":true,"ultimaFacturaSTFD":0}'::jsonb;
-update public.premios set activo = false where entrega_premio;
-update public.premios set activo = true, peso = 0 where premio = 'Sigue intentando';
-insert into public.premios (premio, cantidad, peso, entrega_premio, visible_cliente, sede, compra_minima) values
-  ('Obs Puntas', 2, 0, true, true, 'Satélite', 1500000),
-  ('Obs Nivelador', 1, 0, true, true, 'Satélite', 3000000),
-  ('Obs Taladro', 1, 0, true, true, 'Satélite', 7500000),
-  ('Obs Otra sede', 5, 0, true, true, 'DEKO LÁMINAS', 1500000);
-set role anon;
-do $$
-declare r jsonb; t text;
-  function_base jsonb := '{"mayorEdad":true,"sede":"Satélite","autorizacion":true,"tipoDocumento":"CC"}';
-begin
-  -- 8 millones: el rango más alto que alcanza.
-  t := public.registrar_factura(function_base || '{"nombre":"Uno","celular":"3201000001","numeroDocumento":"70000001","factura":"STFD9001","valorCompra":8000000}')->>'token';
-  r := public.girar(t);
-  if r->>'premio' <> 'Obs Taladro' then raise exception 'rango alto: %', r; end if;
-  if (r->>'restantes')::int <> 0 then raise exception 'un giro por factura: %', r; end if;
-  -- 9 millones: el taladro se agotó, baja al siguiente rango.
-  t := public.registrar_factura(function_base || '{"nombre":"Dos","celular":"3201000002","numeroDocumento":"70000002","factura":"STFD9002","valorCompra":9000000}')->>'token';
-  if public.girar(t)->>'premio' <> 'Obs Nivelador' then raise exception 'baja de rango'; end if;
-  -- 2 millones: rango básico, nunca un premio de otra sede.
-  t := public.registrar_factura(function_base || '{"nombre":"Tres","celular":"3201000003","numeroDocumento":"70000003","factura":"STFD9003","valorCompra":2000000}')->>'token';
-  if public.girar(t)->>'premio' <> 'Obs Puntas' then raise exception 'rango básico'; end if;
-  -- El mismo cliente con otra factura grande: ya recibió su obsequio.
-  t := public.registrar_factura(function_base || '{"nombre":"Tres","celular":"3201000003","numeroDocumento":"70000003","factura":"STFD9004","valorCompra":4000000}')->>'token';
-  r := public.girar(t);
-  if (r->>'es_premio')::boolean then raise exception 'dos obsequios a un cliente: %', r; end if;
-  -- Factura menor al valor del giro: no gira, pero queda registrada.
-  t := public.registrar_factura(function_base || '{"nombre":"Cuatro","celular":"3201000004","numeroDocumento":"70000004","factura":"STFD9005","valorCompra":900000}')->>'token';
-  if (public.estado_factura(t)->>'oportunidades')::int <> 0 then raise exception 'sin giro bajo el mínimo'; end if;
-end $$;
-reset role;
-do $$ begin
-  if (select cantidad from public.premios where premio = 'Obs Otra sede') <> 5 then raise exception 'tocó otra sede'; end if;
-  if (public.campana_publica()->'config'->>'modoObsequio')::boolean is not true then raise exception 'modo público'; end if;
-  if not exists (select 1 from jsonb_array_elements(public.campana_publica()->'premios') e where (e->>'desde')::numeric = 7500000) then raise exception 'rango público'; end if;
-end $$;
-
 \echo PRUEBAS_VENCIMIENTO_OK
