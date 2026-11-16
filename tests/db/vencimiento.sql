@@ -124,4 +124,16 @@ do $$ begin
   if public.campana_publica()::text ~ 'unPremio' then raise exception 'campana_publica expone la regla de un premio'; end if;
 end $$;
 
+-- Después de la fecha de cierre no se gira, aunque la factura se haya registrado antes.
+update public.configuracion_campana set value = value || '{"activa":true,"modoPruebas":false}'::jsonb;
+create temp table tc (t text); grant all on tc to anon;
+set role anon;
+insert into tc select public.registrar_factura('{"mayorEdad":true,"nombre":"Cierre","celular":"3201999001","sede":"Satélite","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"71999001","factura":"STFD9901","valorCompra":3000000}')->>'token';
+reset role;
+update public.configuracion_campana set value = value || jsonb_build_object('fechaFin', (now() - interval '1 minute')::text);
+set role anon;
+select pg_temp.falla(format('select public.girar(%L)', (select t from tc)), 'no está abierta');
+reset role;
+update public.configuracion_campana set value = value - 'fechaFin';
+
 \echo PRUEBAS_VENCIMIENTO_OK
