@@ -19,7 +19,8 @@ export const CAMPANA = {
     { nombre: 'Rehau' },
   ],
   // Copie aquí la ruta del PDF aprobado por el asesor legal, por ejemplo '/Reglamento_39_Anos.pdf'.
-  reglamentoPdf: '',
+  reglamentoPdf: '/reglamento.html',
+  politicaDatos: '/politica-datos.html',
 };
 
 export const SEDES_RESPALDO = [

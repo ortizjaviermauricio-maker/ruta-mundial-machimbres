@@ -8,7 +8,7 @@ const Admin = lazy(() => import('./Admin.jsx'));
 
 const CLAVE_TOKEN = 'campana_factura_token';
 const NAVEGACION = ['Inicio', 'Participar', 'Ruleta', 'Ranking', 'Más'];
-const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaReglamento: false, codigoPrueba: '', tipoDocumento: 'CC', numeroDocumento: '', patrocinadorIds: [], valoresMarca: {} };
+const FORM_VACIO = { nombreCompleto: '', celular: '', sede: '', factura: '', valorCompra: '', autorizacion: false, aceptaMercadeo: false, mayorEdad: false, aceptaReglamento: false, codigoPrueba: '', tipoDocumento: 'CC', numeroDocumento: '', patrocinadorIds: [], valoresMarca: {} };
 const CONFIG_VACIA = { activa: false, compraMinima: 0, valorPorOportunidad: 1, puntosPorOportunidad: 0, maxOportunidades: 0, sedes: SEDES_RESPALDO };
 const DURACION_GIRO = 3300;
 
@@ -187,6 +187,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
   const [enviando, setEnviando] = useState(false);
   const [yaAutorizo, setYaAutorizo] = useState(false);
   const [textoAutorizacion, setTextoAutorizacion] = useState('');
+  const [textoMercadeo, setTextoMercadeo] = useState('');
   // La sede se deduce del prefijo de la factura, igual que en el servidor.
   const facturaLimpia = form.factura.replace(/[\s-]/g, '');
   const sedeDetectada = [...sedes].sort((a, b) => b.prefijo.length - a.prefijo.length)
@@ -196,6 +197,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
 
   useEffect(() => {
     supabase.rpc('texto_autorizacion').then(({ data }) => setTextoAutorizacion(data || ''));
+    supabase.rpc('texto_mercadeo').then(({ data }) => setTextoMercadeo(data || ''));
   }, []);
 
   // Quien ya autorizó con este celular no vuelve a recibir la solicitud de datos.
@@ -240,6 +242,7 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
         ...resto,
         valoresMarca: Object.fromEntries(form.patrocinadorIds.map((id) => [id, Number(form.valoresMarca[id] || 0)])),
         autorizacion: !yaAutorizo && form.autorizacion,
+        aceptaMercadeo: !yaAutorizo && form.autorizacion && form.aceptaMercadeo,
         ...separarNombre(nombreCompleto),
         sede: sedeDetectada?.nombre || '',
         userAgent: navigator.userAgent,
@@ -325,10 +328,20 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
                 </div>
                 <label className="casilla">
                   <input id="autorizacion" type="checkbox" required checked={form.autorizacion} onChange={(e) => setForm({ ...form, autorizacion: e.target.checked })} />
-                  <span>{textoAutorizacion} {config.habeas && `Consultas y reclamos: ${config.habeas}.`}</span>
+                  <span>{textoAutorizacion} <a href="/politica-datos.html" target="_blank" rel="noopener noreferrer">Ver política de datos</a>. {config.habeas && `Consultas y reclamos: ${config.habeas}.`}</span>
                 </label>
+                {textoMercadeo && (
+                  <label className="casilla">
+                    <input id="mercadeo" type="checkbox" checked={form.aceptaMercadeo} onChange={(e) => setForm({ ...form, aceptaMercadeo: e.target.checked })} />
+                    <span>{textoMercadeo}</span>
+                  </label>
+                )}
               </>
             )}
+          <label className="casilla">
+            <input id="mayor-edad" type="checkbox" required checked={form.mayorEdad} onChange={(e) => setForm({ ...form, mayorEdad: e.target.checked })} />
+            <span>Declaro que soy mayor de 18 años.</span>
+          </label>
           <label className="casilla">
             <input id="reglamento" type="checkbox" required checked={form.aceptaReglamento} onChange={(e) => setForm({ ...form, aceptaReglamento: e.target.checked })} />
             <span>Acepto el reglamento de la campaña.{' '}
@@ -594,7 +607,8 @@ function Reglamento() {
         {CAMPANA.reglamentoPdf
           ? <a className="boton" href={CAMPANA.reglamentoPdf} target="_blank" rel="noopener noreferrer">VER REGLAMENTO</a>
           : <p className="nota">El reglamento se publicará antes de abrir la campaña.</p>}
-        <p className="nota">Tus datos se tratan conforme a la Ley 1581 de 2012.</p>
+        <a className="boton oscuro-b" style={{ marginTop: 12 }} href={CAMPANA.politicaDatos} target="_blank" rel="noopener noreferrer">TRATAMIENTO DE DATOS PERSONALES</a>
+        <p className="nota">Tus datos se tratan conforme a la Ley 1581 de 2012. Solo pueden participar mayores de 18 años.</p>
       </div>
     </>
   );

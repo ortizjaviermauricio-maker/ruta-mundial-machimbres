@@ -28,7 +28,7 @@ grant all on tv to anon, authenticated;
 set role anon;
 do $$
 declare
-  base jsonb := '{"nombre":"Vera","apellido":"Paz","celular":"3109990001","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"99887766"}';
+  base jsonb := '{"mayorEdad":true,"nombre":"Vera","apellido":"Paz","celular":"3109990001","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"99887766"}';
   tok text; r jsonb; fin date;
 begin
   tok := public.registrar_factura(base || '{"factura":"FD1","valorCompra":3000000}')->>'token';
@@ -92,7 +92,7 @@ set role anon;
 do $$
 declare tok text; r jsonb;
 begin
-  tok := public.registrar_factura('{"nombre":"Rio","celular":"3109990002","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"11223344","factura":"FD2","valorCompra":1000000}'::jsonb)->>'token';
+  tok := public.registrar_factura('{"mayorEdad":true,"nombre":"Rio","celular":"3109990002","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"11223344","factura":"FD2","valorCompra":1000000}'::jsonb)->>'token';
   r := public.girar(tok);
   if r->>'premio' <> 'Metro láser' then raise exception 'el premio devuelto no volvió a salir: %', r; end if;
 end $$;
@@ -103,6 +103,21 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000002
 set role authenticated;
 do $$ begin perform public.vencer_premios(); end $$;
 reset role;
+
+-- Mayoría de edad y autorización comercial separada (Ley 1581).
+set role anon;
+select pg_temp.falla($$select public.registrar_factura('{"nombre":"Menor","celular":"3109990077","sede":"DEKO LÁMINAS","autorizacion":true,"aceptaReglamento":true,"tipoDocumento":"CC","numeroDocumento":"55667788","factura":"FD77","valorCompra":1000000}')$$, 'mayor de 18');
+do $$ begin
+  perform public.registrar_factura('{"mayorEdad":true,"nombre":"Sin Mercadeo","celular":"3109990078","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"55667789","factura":"FD78","valorCompra":1000000}');
+  perform public.registrar_factura('{"mayorEdad":true,"aceptaMercadeo":true,"nombre":"Con Mercadeo","celular":"3109990079","sede":"DEKO LÁMINAS","autorizacion":true,"tipoDocumento":"CC","numeroDocumento":"55667790","factura":"FD79","valorCompra":1000000}');
+end $$;
+select pg_temp.falla('select public._registrar_factura_base(''{}'')', 'permission denied');
+reset role;
+do $$ begin
+  if (select acepto_mercadeo or finalidades <> array['campanas'] from public.autorizaciones_datos where factura = 'FD78') then raise exception 'mercadeo sin consentimiento'; end if;
+  if not (select acepto_mercadeo and 'whatsapp' = any(finalidades) and texto_mercadeo is not null from public.autorizaciones_datos where factura = 'FD79') then raise exception 'mercadeo no guardado'; end if;
+  if not (select declara_mayor_edad from public.autorizaciones_datos where factura = 'FD79') then raise exception 'mayor de edad'; end if;
+end $$;
 
 -- Las reglas internas no se publican.
 do $$ begin
