@@ -72,20 +72,15 @@ export default function Admin() {
     supabase.rpc('rol_actual').then(({ data }) => setRol(data || 'ninguno'));
   }, [sesion]);
 
+  // El personal entra con usuario y clave, sin correo. Internamente Supabase guarda
+  // el usuario como usuario@panel.machimbres (ese correo no existe ni recibe mensajes).
   async function entrar(e) {
     e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({ email: login.correo.trim(), password: login.clave });
+    const usuario = login.correo.trim().toLowerCase();
+    const email = usuario.includes('@') ? usuario : `${usuario}@panel.machimbres`;
+    const { error } = await supabase.auth.signInWithPassword({ email, password: login.clave });
     setLogin({ correo: login.correo, clave: '' });
-    if (error) alert('Correo o contraseña incorrectos.');
-  }
-
-  async function recuperarClave() {
-    if (!login.correo.trim()) {
-      alert('Escriba su correo primero.');
-      return;
-    }
-    await supabase.auth.resetPasswordForEmail(login.correo.trim(), { redirectTo: window.location.origin });
-    alert('Si el correo está autorizado, recibirá un enlace para cambiar la contraseña.');
+    if (error) alert('Usuario o clave incorrectos.');
   }
 
   if (!listo) return <p>Cargando…</p>;
@@ -95,11 +90,10 @@ export default function Admin() {
       <div className="loginBox">
         <h2>Acceso del personal</h2>
         <form onSubmit={entrar}>
-          <input required type="email" placeholder="Correo" autoComplete="username" value={login.correo} onChange={(e) => setLogin({ ...login, correo: e.target.value })} />
+          <input required type="text" placeholder="Usuario" autoCapitalize="none" autoComplete="username" value={login.correo} onChange={(e) => setLogin({ ...login, correo: e.target.value })} />
           <input required type="password" placeholder="Contraseña" autoComplete="current-password" value={login.clave} onChange={(e) => setLogin({ ...login, clave: e.target.value })} />
           <button className="primary" type="submit">Ingresar</button>
         </form>
-        <button className="linkButton" type="button" onClick={recuperarClave}>Olvidé mi contraseña</button>
       </div>
     );
   }
@@ -378,7 +372,7 @@ function Panel({ rol, correo }) {
   return (
     <>
       <div className="adminHeader">
-        <div><h2>{esAdmin ? 'Panel administrativo' : 'Entrega de premios'}</h2><p>{correo}</p></div>
+        <div><h2>{esAdmin ? 'Panel administrativo' : 'Entrega de premios'}</h2><p>{(correo || "").replace("@panel.machimbres", "")}</p></div>
         <button className="logout" onClick={() => supabase.auth.signOut()}>Salir</button>
       </div>
 
