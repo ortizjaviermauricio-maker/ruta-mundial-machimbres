@@ -12,7 +12,7 @@ export const CAMPANA = {
     { nombre: 'Tablemac' },
     { nombre: 'Primadera', logo: '/primadera-logo.svg' },
     { nombre: 'Ecofort', logo: '/ecofort-logo.png' },
-    { nombre: 'Moduofi' },
+    { nombre: 'MadeOfi', logo: '/madeofi-logo.png' },
     { nombre: 'Masisa' },
     { nombre: 'Cimca' },
     { nombre: 'Pelikano' },
