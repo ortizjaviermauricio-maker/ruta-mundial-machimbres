@@ -218,29 +218,15 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
     };
   }, [form.celular]);
 
-  function alternarMarca(id) {
-    setForm((prev) => {
-      const activa = prev.patrocinadorIds.includes(id);
-      const valoresMarca = { ...prev.valoresMarca };
-      if (activa) delete valoresMarca[id];
-      return { ...prev, valoresMarca, patrocinadorIds: activa ? prev.patrocinadorIds.filter((x) => x !== id) : [...prev.patrocinadorIds, id] };
-    });
-  }
-  const sumaMarcas = form.patrocinadorIds.reduce((t, id) => t + Number(form.valoresMarca[id] || 0), 0);
-  const marcasExcedidas = sumaMarcas > valor;
-
   async function enviar(e) {
     e.preventDefault();
-    if (marcasExcedidas) {
-      alert('La suma de las marcas no puede superar el valor de la factura.');
-      return;
-    }
     setEnviando(true);
     const { nombreCompleto, ...resto } = form;
     const { data, error } = await supabase.rpc('registrar_factura', {
       p_datos: {
         ...resto,
-        valoresMarca: Object.fromEntries(form.patrocinadorIds.map((id) => [id, Number(form.valoresMarca[id] || 0)])),
+        patrocinadorIds: [],
+        valoresMarca: {},
         autorizacion: !yaAutorizo && form.autorizacion,
         aceptaMercadeo: !yaAutorizo && form.autorizacion && form.aceptaMercadeo,
         ...separarNombre(nombreCompleto),
@@ -268,41 +254,12 @@ function Registro({ config, sedes, patrocinadores, alRegistrar }) {
           <label>Celular<input id="celular" required inputMode="tel" autoComplete="tel" value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} /></label>
           <div className="dos">
             <label>Factura<input id="factura" required placeholder={`${sedes.map((x) => x.prefijo).join(', ')} + número`} autoCapitalize="characters" value={form.factura} onChange={(e) => setForm({ ...form, factura: e.target.value.toUpperCase() })} /></label>
-            <label>Valor exacto<input id="valor" required type="number" inputMode="numeric" min="0" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
+            <label>Valor antes de IVA<input id="valor" required type="number" inputMode="numeric" min="0" value={form.valorCompra} onChange={(e) => setForm({ ...form, valorCompra: e.target.value })} /></label>
           </div>
           {facturaLimpia && (
             <p className="nota" aria-live="polite" style={{ fontSize: 14 }}>
               {sedeDetectada ? `Sede: ${sedeDetectada.nombre}` : `La factura debe empezar con ${sedes.map((x) => x.prefijo).join(', ')}.`}
             </p>
-          )}
-          {patrocinadores.length > 0 && (
-            <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-              <legend style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>¿Compraste láminas de estas marcas?</legend>
-              <p className="nota" style={{ fontSize: 14, margin: '0 0 6px' }}>Marca el proveedor y escribe cuánto de esta factura fue de esa marca. Suma para su ranking.</p>
-              <div className="marcas">
-                {patrocinadores.map((p) => (
-                  <div key={p.id} className="marca-valor">
-                    <label>
-                      <input type="checkbox" checked={form.patrocinadorIds.includes(p.id)} onChange={() => alternarMarca(p.id)} />
-                      {p.logo_url ? <img src={p.logo_url} alt={p.nombre} /> : p.nombre}
-                    </label>
-                    {form.patrocinadorIds.includes(p.id) && (
-                      <input
-                        aria-label={`Valor de ${p.nombre} en esta factura`}
-                        placeholder={`Valor ${p.nombre}`}
-                        required
-                        type="number"
-                        inputMode="numeric"
-                        min="1"
-                        value={form.valoresMarca[p.id] || ''}
-                        onChange={(e) => setForm({ ...form, valoresMarca: { ...form.valoresMarca, [p.id]: e.target.value } })}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              {marcasExcedidas && <p className="nota" role="alert" style={{ fontSize: 14, color: '#b42318' }}>La suma de las marcas ({money(sumaMarcas)}) supera el valor de la factura.</p>}
-            </fieldset>
           )}
           {valor > 0 && (
             <div className="calculo">
